@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="cozy-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#df9e82" />
+      <stop offset="100%" stop-color="#ca8569" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#fcf8f3" />
+  <!-- Cute stylized low-poly couple roof & room -->
+  <path d="M32 14 L50 28 L46 28 L46 48 L18 48 L18 28 L14 28 Z" fill="url(#cozy-grad)" />
+  <!-- Heart in center of room -->
+  <path d="M32 36 C32 33 28 31 26 33 C23 36 28 41 32 44 C36 41 41 36 38 33 C36 31 32 33 32 36 Z" fill="#ffffff" />
+</svg>

@@ -1,0 +1,148 @@
+/* Cozy Low-poly HUD Styling */
+.hud-container {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+  user-select: none;
+  font-family: 'Quicksand', 'Outfit', sans-serif;
+  animation: hudFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes hudFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Character Switcher Card */
+.hud-card {
+  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 24px rgba(160, 140, 120, 0.12);
+  border-radius: 20px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hud-avatars {
+  display: flex;
+  background: rgba(235, 225, 215, 0.45);
+  padding: 4px;
+  border-radius: 14px;
+  gap: 4px;
+}
+
+.hud-avatar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #7d7268;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  border: none;
+  background: transparent;
+}
+
+.hud-avatar-btn:hover {
+  color: #38302b;
+}
+
+.hud-avatar-btn.active.boy {
+  background: #ffffff;
+  color: #43695f;
+  box-shadow: 0 4px 12px rgba(67, 105, 95, 0.18);
+}
+
+.hud-avatar-btn.active.girl {
+  background: #ffffff;
+  color: #c96e60;
+  box-shadow: 0 4px 12px rgba(201, 110, 96, 0.18);
+}
+
+.hud-avatar-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.hud-tab-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: #9c8e82;
+  padding-left: 4px;
+  border-left: 1px solid rgba(200, 185, 170, 0.35);
+}
+
+.kbd-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  background: #f7f1eb;
+  border: 1px solid #e3d5c8;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #665a50;
+  font-family: monospace;
+}
+
+/* Controls Guide Card (bottom-left or collapsible) */
+.hud-controls-card {
+  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 16px rgba(160, 140, 120, 0.08);
+  border-radius: 16px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #6d6258;
+}
+
+.hud-control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-keys-group {
+  display: flex;
+  gap: 3px;
+}
+
+@media (max-width: 640px) {
+  .hud-container {
+    top: 12px;
+    left: 12px;
+  }
+  .hud-controls-card {
+    display: none; /* Keep clean on small mobile screens */
+  }
+}
