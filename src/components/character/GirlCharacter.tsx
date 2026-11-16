@@ -112,7 +112,7 @@ export const GirlCharacter: React.FC<GirlCharacterProps> = ({
   return (
     <group ref={rootGroupRef} name="girl-character">
       {/* Floating 3D Name Tag */}
-      <CharacterNameTag type="girl" isActive={isActive} offsetY={1.82} />
+      <CharacterNameTag type="girl" isActive={isActive} offsetY={1.95} />
 
       {/* Active Indicator Pin (Shows who is controlled) */}
       {isActive && (
