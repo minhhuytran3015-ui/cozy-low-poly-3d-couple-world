@@ -21,7 +21,8 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
       position={[0, offsetY, 0]}
       center
       distanceFactor={7.5}
-      zIndexRange={[100, 0]}
+      occlude={false}
+      sprite
       style={{
         pointerEvents: 'none',
         userSelect: 'none',
@@ -51,12 +52,12 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
             WebkitBackdropFilter: 'blur(8px)',
             border: isActive
               ? `2px solid ${config.themeColor}`
-              : '1.5px solid rgba(220, 215, 210, 0.8)',
+              : `1.5px solid ${config.themeColor}66`,
             boxShadow: isActive
               ? `0 6px 18px rgba(0, 0, 0, 0.12), 0 0 14px ${config.themeColor}35`
-              : '0 3px 10px rgba(0, 0, 0, 0.08)',
+              : `0 3px 10px rgba(0, 0, 0, 0.08), 0 0 8px ${config.themeColor}20`,
             transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            transform: isActive ? 'scale(1.06)' : 'scale(1)',
+            transform: isActive ? 'scale(1.06)' : 'scale(0.95)',
           }}
         >
           {/* Circular avatar badge */}
@@ -65,11 +66,11 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: isActive ? '24px' : '20px',
-              height: isActive ? '24px' : '20px',
+              width: isActive ? '24px' : '22px',
+              height: isActive ? '24px' : '22px',
               borderRadius: '50%',
               backgroundColor: config.accentBg,
-              fontSize: isActive ? '13px' : '11px',
+              fontSize: isActive ? '13px' : '12px',
               boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)',
               transition: 'all 0.25s ease',
             }}
@@ -80,18 +81,19 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
           {/* Name Text */}
           <span
             style={{
-              fontSize: isActive ? '13px' : '11.5px',
+              fontSize: isActive ? '13px' : '12px',
               fontWeight: 700,
               fontFamily: "'Quicksand', 'Outfit', sans-serif",
-              color: isActive ? config.themeColor : '#5c544d',
+              color: isActive ? config.themeColor : config.themeColor,
               letterSpacing: '0.2px',
+              opacity: isActive ? 1 : 0.85,
             }}
           >
             {config.displayName}
           </span>
 
           {/* Active status pulse indicator */}
-          {isActive ? (
+          {isActive && (
             <span
               style={{
                 position: 'relative',
@@ -124,16 +126,6 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
                 }}
               />
             </span>
-          ) : (
-            <span
-              style={{
-                fontSize: '10px',
-                opacity: 0.65,
-                marginLeft: '1px',
-              }}
-            >
-              🤍
-            </span>
           )}
 
           {/* Little downward speech pointer */}
@@ -147,7 +139,7 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
               height: 0,
               borderLeft: '5px solid transparent',
               borderRight: '5px solid transparent',
-              borderTop: `5px solid ${isActive ? config.themeColor : 'rgba(220, 215, 210, 0.9)'}`,
+              borderTop: `5px solid ${isActive ? config.themeColor : config.themeColor + '66'}`,
               transition: 'border-color 0.3s ease',
             }}
           />
