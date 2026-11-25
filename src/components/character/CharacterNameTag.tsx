@@ -1,5 +1,7 @@
-import React from 'react';
-import { Html } from '@react-three/drei';
+import React, { useRef } from 'react';
+import { Billboard, Text } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import { characterConfig } from '../../data/characterConfig';
 import type { CharacterType } from './types';
 
@@ -15,154 +17,130 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
   offsetY = 1.95,
 }) => {
   const config = characterConfig[type];
+  const groupRef = useRef<THREE.Group>(null);
+  const bgRef = useRef<THREE.Mesh>(null);
+  const dotRef = useRef<THREE.Mesh>(null);
+  const pulseRef = useRef<THREE.Mesh>(null);
+  const pointerRef = useRef<THREE.Mesh>(null);
+
+  // Floating animation + pulse
+  useFrame((_, delta) => {
+    if (!groupRef.current) return;
+
+    // Gentle floating bob
+    const time = performance.now() * 0.001;
+    groupRef.current.position.y = offsetY + Math.sin(time * 2.2) * 0.03;
+
+    // Pulse animation for active indicator dot
+    if (pulseRef.current && isActive) {
+      const pulse = (Math.sin(time * 3.5) + 1) * 0.5; // 0 to 1
+      pulseRef.current.scale.setScalar(1 + pulse * 1.2);
+      (pulseRef.current.material as THREE.MeshBasicMaterial).opacity = 0.6 * (1 - pulse);
+    }
+  });
+
+  const themeColor = new THREE.Color(config.themeColor);
+  const bgColor = isActive ? '#ffffff' : '#faf8f6';
+  const borderColor = config.themeColor;
+
+  // Measurements for the pill background
+  const pillWidth = isActive ? 0.52 : 0.46;
+  const pillHeight = 0.12;
 
   return (
-    <Html
-      position={[0, offsetY, 0]}
-      center
-      distanceFactor={7.5}
-      occlude={false}
-      sprite
-      style={{
-        pointerEvents: 'none',
-        userSelect: 'none',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          animation: 'tagFloat 2.8s ease-in-out infinite',
-        }}
-      >
-        <div
-          style={{
-            position: 'relative',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: isActive ? '4px 12px 4px 6px' : '3px 10px 3px 5px',
-            borderRadius: '999px',
-            backgroundColor: isActive
-              ? 'rgba(255, 255, 255, 0.98)'
-              : 'rgba(255, 255, 255, 0.88)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            border: isActive
-              ? `2px solid ${config.themeColor}`
-              : `1.5px solid ${config.themeColor}66`,
-            boxShadow: isActive
-              ? `0 6px 18px rgba(0, 0, 0, 0.12), 0 0 14px ${config.themeColor}35`
-              : `0 3px 10px rgba(0, 0, 0, 0.08), 0 0 8px ${config.themeColor}20`,
-            transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            transform: isActive ? 'scale(1.06)' : 'scale(0.95)',
-          }}
-        >
-          {/* Circular avatar badge */}
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: isActive ? '24px' : '22px',
-              height: isActive ? '24px' : '22px',
-              borderRadius: '50%',
-              backgroundColor: config.accentBg,
-              fontSize: isActive ? '13px' : '12px',
-              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)',
-              transition: 'all 0.25s ease',
-            }}
-          >
-            {config.avatarIcon}
-          </span>
-
-          {/* Name Text */}
-          <span
-            style={{
-              fontSize: isActive ? '13px' : '12px',
-              fontWeight: 700,
-              fontFamily: "'Quicksand', 'Outfit', sans-serif",
-              color: isActive ? config.themeColor : config.themeColor,
-              letterSpacing: '0.2px',
-              opacity: isActive ? 1 : 0.85,
-            }}
-          >
-            {config.displayName}
-          </span>
-
-          {/* Active status pulse indicator */}
-          {isActive && (
-            <span
-              style={{
-                position: 'relative',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '8px',
-                height: '8px',
-                marginLeft: '2px',
-              }}
-            >
-              <span
-                style={{
-                  position: 'absolute',
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '50%',
-                  backgroundColor: config.themeColor,
-                  opacity: 0.75,
-                  animation: 'tagPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite',
-                }}
-              />
-              <span
-                style={{
-                  position: 'relative',
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  backgroundColor: config.themeColor,
-                }}
-              />
-            </span>
-          )}
-
-          {/* Little downward speech pointer */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '-5px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 0,
-              height: 0,
-              borderLeft: '5px solid transparent',
-              borderRight: '5px solid transparent',
-              borderTop: `5px solid ${isActive ? config.themeColor : config.themeColor + '66'}`,
-              transition: 'border-color 0.3s ease',
-            }}
+    <group ref={groupRef} position={[0, offsetY, 0]}>
+      <Billboard follow lockX={false} lockY={false} lockZ={false}>
+        {/* Background pill shape */}
+        <mesh ref={bgRef} position={[0, 0, -0.001]} renderOrder={1}>
+          <planeGeometry args={[pillWidth, pillHeight]} />
+          <meshBasicMaterial
+            color={bgColor}
+            transparent
+            opacity={isActive ? 0.95 : 0.85}
+            depthTest={false}
           />
-        </div>
-      </div>
+        </mesh>
 
-      <style>{`
-        @keyframes tagFloat {
-          0%, 100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-5px);
-          }
-        }
-        @keyframes tagPing {
-          75%, 100% {
-            transform: scale(2.2);
-            opacity: 0;
-          }
-        }
-      `}</style>
-    </Html>
+        {/* Border outline (slightly larger plane behind) */}
+        <mesh position={[0, 0, -0.002]} renderOrder={0}>
+          <planeGeometry args={[pillWidth + 0.016, pillHeight + 0.016]} />
+          <meshBasicMaterial
+            color={borderColor}
+            transparent
+            opacity={isActive ? 0.9 : 0.4}
+            depthTest={false}
+          />
+        </mesh>
+
+        {/* Avatar emoji as text */}
+        <Text
+          position={[-(pillWidth / 2) + 0.07, 0, 0]}
+          fontSize={0.055}
+          anchorX="center"
+          anchorY="middle"
+          depthOffset={-2}
+          renderOrder={2}
+        >
+          {config.avatarIcon}
+        </Text>
+
+        {/* Display name */}
+        <Text
+          position={[0.01, 0, 0]}
+          fontSize={isActive ? 0.048 : 0.044}
+          anchorX="center"
+          anchorY="middle"
+          color={config.themeColor}
+          font="https://fonts.gstatic.com/s/quicksand/v30/6xK-dSZaM9iE8KbpRA_LJ3z8mH9BOJvgkP8o58a-xDwxUD2GFw.woff"
+          fontWeight={700}
+          depthOffset={-2}
+          renderOrder={2}
+          material-depthTest={false}
+        >
+          {config.displayName}
+        </Text>
+
+        {/* Active indicator dot */}
+        {isActive && (
+          <group position={[(pillWidth / 2) - 0.04, 0, 0]}>
+            {/* Pulse ring */}
+            <mesh ref={pulseRef} renderOrder={2}>
+              <circleGeometry args={[0.016, 16]} />
+              <meshBasicMaterial
+                color={borderColor}
+                transparent
+                opacity={0.5}
+                depthTest={false}
+              />
+            </mesh>
+            {/* Solid dot */}
+            <mesh ref={dotRef} position={[0, 0, 0.001]} renderOrder={3}>
+              <circleGeometry args={[0.012, 16]} />
+              <meshBasicMaterial
+                color={borderColor}
+                depthTest={false}
+              />
+            </mesh>
+          </group>
+        )}
+
+        {/* Downward pointer triangle */}
+        <mesh
+          ref={pointerRef}
+          position={[0, -(pillHeight / 2) - 0.015, -0.001]}
+          rotation={[0, 0, Math.PI]}
+          renderOrder={1}
+        >
+          <coneGeometry args={[0.018, 0.025, 3]} />
+          <meshBasicMaterial
+            color={borderColor}
+            transparent
+            opacity={isActive ? 0.9 : 0.4}
+            depthTest={false}
+          />
+        </mesh>
+      </Billboard>
+    </group>
   );
 };
 
