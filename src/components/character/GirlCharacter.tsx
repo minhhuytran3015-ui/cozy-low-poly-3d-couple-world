@@ -3,15 +3,18 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import CharacterNameTag from './CharacterNameTag';
 import type { CharacterTransformData } from './BoyCharacter';
+import type { EmoteType } from '../../hooks/useMultiplayer';
 
 interface GirlCharacterProps {
   transformRef: React.MutableRefObject<CharacterTransformData>;
   isActive: boolean;
+  emote?: EmoteType | null;
 }
 
 export const GirlCharacter: React.FC<GirlCharacterProps> = ({
   transformRef,
   isActive,
+  emote = null,
 }) => {
   const rootGroupRef = useRef<THREE.Group>(null);
   const bodyRef = useRef<THREE.Group>(null);
@@ -112,7 +115,7 @@ export const GirlCharacter: React.FC<GirlCharacterProps> = ({
   return (
     <group ref={rootGroupRef} name="girl-character">
       {/* Floating 3D Name Tag */}
-      <CharacterNameTag type="girl" isActive={isActive} offsetY={1.95} />
+      <CharacterNameTag type="girl" isActive={isActive} offsetY={1.95} emote={emote} />
 
       {/* Active Indicator Pin (Shows who is controlled) */}
       {isActive && (

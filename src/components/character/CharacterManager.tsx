@@ -6,6 +6,7 @@ import type { CharacterTransformData } from './BoyCharacter';
 import GirlCharacter from './GirlCharacter';
 import type { CharacterType } from './types';
 import type { KeyboardState } from '../../hooks/useKeyboardControls';
+import type { CharacterSyncState, EmoteType } from '../../hooks/useMultiplayer';
 
 interface CharacterManagerProps {
   activeCharacter: CharacterType;
@@ -13,6 +14,11 @@ interface CharacterManagerProps {
   onTargetPositionChange?: (pos: THREE.Vector3) => void;
   keysRef: React.MutableRefObject<KeyboardState>;
   enabled?: boolean;
+  isPartnerOnline?: boolean;
+  remoteStateRef?: React.MutableRefObject<CharacterSyncState | null>;
+  onSendLocalState?: (state: CharacterSyncState) => void;
+  boyEmote?: EmoteType | null;
+  girlEmote?: EmoteType | null;
 }
 
 // Obstacle definitions for cozy room furniture
@@ -30,6 +36,11 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   onTargetPositionChange,
   keysRef,
   enabled = true,
+  isPartnerOnline = false,
+  remoteStateRef,
+  onSendLocalState,
+  boyEmote = null,
+  girlEmote = null,
 }) => {
   const { camera } = useThree();
 
@@ -49,7 +60,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
     isSprinting: false,
   });
 
-  // Reusable vectors in module/refs to avoid GC in useFrame
+  // Reusable vectors in refs to avoid GC in useFrame
   const moveDir = useRef(new THREE.Vector3());
   const camForward = useRef(new THREE.Vector3());
   const camRight = useRef(new THREE.Vector3());
@@ -67,12 +78,48 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   }, [activeCharacter, onTargetPositionChange]);
 
   useFrame((_, delta) => {
-    if (!enabled) return;
-
-    const keys = keysRef.current;
     const isBoy = activeCharacter === 'boy';
     const active = isBoy ? boyTransform.current : girlTransform.current;
     const other = isBoy ? girlTransform.current : boyTransform.current;
+
+    // Update remote character even when local overlay/viewer is open!
+    const remote = remoteStateRef?.current;
+    if (isPartnerOnline && remote && remote.character !== activeCharacter) {
+      const alpha = 1 - Math.exp(-15 * delta);
+      other.position.x = THREE.MathUtils.lerp(other.position.x, remote.x, alpha);
+      other.position.z = THREE.MathUtils.lerp(other.position.z, remote.z, alpha);
+
+      let rotDiff = remote.rotation - other.rotation;
+      while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+      while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+      other.rotation += rotDiff * alpha;
+
+      const distToTarget = Math.hypot(remote.x - other.position.x, remote.z - other.position.z);
+      const isStale = remote.updatedAt ? performance.now() - remote.updatedAt > 500 : false;
+      other.isMoving = remote.isMoving || (!isStale && distToTarget > 0.03);
+      other.isSprinting = remote.isSprinting;
+    } else {
+      other.isMoving = false;
+      other.isSprinting = false;
+    }
+
+    if (!enabled) {
+      active.isMoving = false;
+      active.isSprinting = false;
+      if (onSendLocalState) {
+        onSendLocalState({
+          character: activeCharacter,
+          x: active.position.x,
+          z: active.position.z,
+          rotation: active.rotation,
+          isMoving: false,
+          isSprinting: false,
+        });
+      }
+      return;
+    }
+
+    const keys = keysRef.current;
 
     // 1. Calculate camera-relative forward and right vectors projected onto horizontal plane (Y=0)
     camera.getWorldDirection(camForward.current);
@@ -112,7 +159,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       let nextX = active.position.x + moveDir.current.x * speed * delta;
       let nextZ = active.position.z + moveDir.current.z * speed * delta;
 
-      // 3. Collision with Room boundary walls (clamp smoothly)
+      // 3. Collision with Room boundary walls
       nextX = Math.max(-ROOM_HALF_SIZE, Math.min(ROOM_HALF_SIZE, nextX));
       nextZ = Math.max(-ROOM_HALF_SIZE, Math.min(ROOM_HALF_SIZE, nextZ));
 
@@ -131,7 +178,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
         }
       }
 
-      // 5. Collision with the other character (prevent standing inside each other)
+      // 5. Collision with the other character
       const cdx = nextX - other.position.x;
       const cdz = nextZ - other.position.z;
       const cdistSq = cdx * cdx + cdz * cdz;
@@ -144,7 +191,6 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
         }
       }
 
-      // Re-clamp in case push-out pushed near wall
       nextX = Math.max(-ROOM_HALF_SIZE, Math.min(ROOM_HALF_SIZE, nextX));
       nextZ = Math.max(-ROOM_HALF_SIZE, Math.min(ROOM_HALF_SIZE, nextZ));
 
@@ -155,9 +201,17 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       active.isSprinting = false;
     }
 
-    // Inactive character is always idle
-    other.isMoving = false;
-    other.isSprinting = false;
+    // Broadcast local character state to connected partner
+    if (onSendLocalState) {
+      onSendLocalState({
+        character: activeCharacter,
+        x: active.position.x,
+        z: active.position.z,
+        rotation: active.rotation,
+        isMoving: active.isMoving,
+        isSprinting: active.isSprinting,
+      });
+    }
 
     // Update active position reference for FollowCamera
     activePos.current.copy(active.position);
@@ -172,12 +226,14 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       <BoyCharacter
         transformRef={boyTransform}
         isActive={activeCharacter === 'boy'}
+        emote={boyEmote}
       />
 
       {/* Girl Character */}
       <GirlCharacter
         transformRef={girlTransform}
         isActive={activeCharacter === 'girl'}
+        emote={girlEmote}
       />
     </group>
   );

@@ -4,6 +4,7 @@ import type { CharacterType } from '../character/types';
 import { characterConfig } from '../../data/characterConfig';
 import type { InputMode } from '../../hooks/useDeviceMode';
 import type { CameraControlHandle } from '../camera/FollowCamera';
+import type { EmoteType, MultiplayerStatus } from '../../hooks/useMultiplayer';
 
 interface ControlHUDProps {
   activeCharacter: CharacterType;
@@ -11,6 +12,9 @@ interface ControlHUDProps {
   inputMode: InputMode;
   onToggleInputMode: () => void;
   onOpenGallery: () => void;
+  onOpenMultiplayer: () => void;
+  onSendEmote: (emote: EmoteType) => void;
+  multiplayerStatus: MultiplayerStatus;
   memoryCount: number;
   cameraControlRef?: React.MutableRefObject<CameraControlHandle | null>;
   visible?: boolean;
@@ -22,6 +26,9 @@ export const ControlHUD: React.FC<ControlHUDProps> = ({
   inputMode,
   onToggleInputMode,
   onOpenGallery,
+  onOpenMultiplayer,
+  onSendEmote,
+  multiplayerStatus,
   memoryCount,
   cameraControlRef,
   visible = true,
@@ -29,6 +36,22 @@ export const ControlHUD: React.FC<ControlHUDProps> = ({
   if (!visible) return null;
 
   const isTouchMode = inputMode === 'touch';
+  const isPartnerOnline = multiplayerStatus === 'connected';
+
+  const mpBadge = (() => {
+    switch (multiplayerStatus) {
+      case 'connected':
+        return { icon: '🟢', label: 'Đang chơi cùng' };
+      case 'waiting':
+        return { icon: '🟡', label: 'Chờ người ấy' };
+      case 'connecting':
+        return { icon: '🟡', label: 'Đang kết nối' };
+      case 'error':
+        return { icon: '🔴', label: 'Thử lại' };
+      default:
+        return { icon: '💞', label: 'Chơi chung' };
+    }
+  })();
 
   return (
     <>
@@ -42,11 +65,15 @@ export const ControlHUD: React.FC<ControlHUDProps> = ({
               aria-selected={activeCharacter === 'boy'}
               className={`hud-avatar-btn ${activeCharacter === 'boy' ? 'active boy' : ''}`}
               onClick={() => onSwitchCharacter('boy')}
+              title={isPartnerOnline && activeCharacter !== 'boy' ? 'Đổi vai cho nhau' : undefined}
             >
               <span className="hud-avatar-icon" aria-hidden="true">
                 {characterConfig.boy.avatarIcon}
               </span>
               <span>{characterConfig.boy.displayName}</span>
+              {isPartnerOnline && activeCharacter !== 'boy' && (
+                <span className="hud-online-dot" title="Người ấy đang điều khiển" />
+              )}
             </button>
 
             <button
@@ -55,15 +82,19 @@ export const ControlHUD: React.FC<ControlHUDProps> = ({
               aria-selected={activeCharacter === 'girl'}
               className={`hud-avatar-btn ${activeCharacter === 'girl' ? 'active girl' : ''}`}
               onClick={() => onSwitchCharacter('girl')}
+              title={isPartnerOnline && activeCharacter !== 'girl' ? 'Đổi vai cho nhau' : undefined}
             >
               <span className="hud-avatar-icon" aria-hidden="true">
                 {characterConfig.girl.avatarIcon}
               </span>
               <span>{characterConfig.girl.displayName}</span>
+              {isPartnerOnline && activeCharacter !== 'girl' && (
+                <span className="hud-online-dot" title="Người ấy đang điều khiển" />
+              )}
             </button>
           </div>
 
-          {!isTouchMode && (
+          {!isTouchMode && !isPartnerOnline && (
             <div className="hud-tab-hint">
               <kbd className="kbd-badge">Tab</kbd>
               <span>đổi</span>
@@ -102,8 +133,29 @@ export const ControlHUD: React.FC<ControlHUDProps> = ({
         )}
       </aside>
 
-      {/* Top-right Quick Toolbar (Album + Input Mode Toggle + Desktop Reset Camera) */}
+      {/* Top-right Quick Toolbar (Multiplayer + Heart Emote + Album + Mode) */}
       <div className="hud-top-right">
+        <button
+          type="button"
+          className={`hud-pill-btn ${isPartnerOnline ? 'mp-online' : ''}`}
+          onClick={onOpenMultiplayer}
+          aria-label="Chơi chung thời gian thực"
+          title="Mời người ấy vào chơi chung"
+        >
+          <span aria-hidden="true">{mpBadge.icon}</span>
+          <span className="hud-mp-label">{mpBadge.label}</span>
+        </button>
+
+        <button
+          type="button"
+          className="hud-pill-btn"
+          onClick={() => onSendEmote('heart')}
+          aria-label="Thả tim"
+          title="Thả tim cho người ấy"
+        >
+          <span aria-hidden="true">❤️</span>
+        </button>
+
         <button
           type="button"
           className="hud-pill-btn"
@@ -119,7 +171,7 @@ export const ControlHUD: React.FC<ControlHUDProps> = ({
         {!isTouchMode && cameraControlRef && (
           <button
             type="button"
-            className="hud-pill-btn hud-icon-only-mobile"
+            className="hud-pill-btn"
             onClick={() => cameraControlRef.current?.resetView()}
             title="Đặt lại góc nhìn camera"
             aria-label="Đặt lại góc nhìn camera"

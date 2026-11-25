@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import CharacterNameTag from './CharacterNameTag';
+import type { EmoteType } from '../../hooks/useMultiplayer';
 
 export interface CharacterTransformData {
   position: THREE.Vector3;
@@ -13,11 +14,13 @@ export interface CharacterTransformData {
 interface BoyCharacterProps {
   transformRef: React.MutableRefObject<CharacterTransformData>;
   isActive: boolean;
+  emote?: EmoteType | null;
 }
 
 export const BoyCharacter: React.FC<BoyCharacterProps> = ({
   transformRef,
   isActive,
+  emote = null,
 }) => {
   const rootGroupRef = useRef<THREE.Group>(null);
   const bodyRef = useRef<THREE.Group>(null);
@@ -117,7 +120,7 @@ export const BoyCharacter: React.FC<BoyCharacterProps> = ({
   return (
     <group ref={rootGroupRef} name="boy-character">
       {/* Floating 3D Name Tag */}
-      <CharacterNameTag type="boy" isActive={isActive} offsetY={1.95} />
+      <CharacterNameTag type="boy" isActive={isActive} offsetY={1.95} emote={emote} />
 
       {/* Active Indicator Pin (Shows who is controlled) */}
       {isActive && (

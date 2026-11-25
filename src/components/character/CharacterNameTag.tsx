@@ -4,46 +4,84 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { characterConfig } from '../../data/characterConfig';
 import type { CharacterType } from './types';
+import type { EmoteType } from '../../hooks/useMultiplayer';
 
 interface CharacterNameTagProps {
   type: CharacterType;
   isActive: boolean;
   offsetY?: number;
+  emote?: EmoteType | null;
 }
 
 export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
   type,
   isActive,
   offsetY = 1.95,
+  emote = null,
 }) => {
   const config = characterConfig[type];
   const groupRef = useRef<THREE.Group>(null);
   const pulseRef = useRef<THREE.Mesh>(null);
+  const emoteGroupRef = useRef<THREE.Group>(null);
 
   // Floating animation + pulse
   useFrame(() => {
-    if (!groupRef.current) return;
-
     const time = performance.now() * 0.001;
-    groupRef.current.position.y = offsetY + Math.sin(time * 2.2) * 0.03;
+
+    if (groupRef.current) {
+      groupRef.current.position.y = offsetY + Math.sin(time * 2.2) * 0.03;
+    }
 
     if (pulseRef.current && isActive) {
       const pulse = (Math.sin(time * 3.5) + 1) * 0.5;
       pulseRef.current.scale.setScalar(1 + pulse * 1.25);
       (pulseRef.current.material as THREE.MeshBasicMaterial).opacity = 0.65 * (1 - pulse);
     }
+
+    if (emoteGroupRef.current && emote) {
+      const bounce = Math.abs(Math.sin(time * 5.0)) * 0.045;
+      emoteGroupRef.current.position.y = 0.21 + bounce;
+    }
   });
 
   const bgColor = isActive ? '#ffffff' : '#faf8f6';
   const borderColor = config.themeColor;
 
-  // Slightly larger measurements for crisp readability across phone, iPad, and desktop
   const pillWidth = isActive ? 0.66 : 0.58;
   const pillHeight = isActive ? 0.16 : 0.145;
 
   return (
     <group ref={groupRef} position={[0, offsetY, 0]}>
       <Billboard follow lockX={false} lockY={false} lockZ={false}>
+        {/* Floating Emote Bubble when active */}
+        {emote && (
+          <group ref={emoteGroupRef} position={[0, 0.21, 0.005]}>
+            <mesh renderOrder={14}>
+              <circleGeometry args={[0.085, 24]} />
+              <meshBasicMaterial
+                color={emote === 'heart' ? '#ff6b81' : '#f4a261'}
+                depthTest={false}
+              />
+            </mesh>
+            <mesh position={[0, 0, -0.001]} renderOrder={13}>
+              <circleGeometry args={[0.1, 24]} />
+              <meshBasicMaterial color="#ffffff" depthTest={false} />
+            </mesh>
+            <Text
+              position={[0, 0, 0.002]}
+              fontSize={emote === 'heart' ? 0.09 : 0.055}
+              anchorX="center"
+              anchorY="middle"
+              color="#ffffff"
+              fontWeight={700}
+              renderOrder={15}
+              material-depthTest={false}
+            >
+              {emote === 'heart' ? '♥' : 'HI!'}
+            </Text>
+          </group>
+        )}
+
         {/* Background pill shape */}
         <mesh position={[0, 0, -0.001]} renderOrder={10}>
           <planeGeometry args={[pillWidth, pillHeight]} />
@@ -66,7 +104,7 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
           />
         </mesh>
 
-        {/* Crisp 3D avatar circle badge (replaces unsupported emoji glyphs in WebGL text) */}
+        {/* Crisp 3D avatar circle badge */}
         <group position={[-(pillWidth / 2) + 0.075, 0, 0.002]}>
           <mesh renderOrder={11}>
             <circleGeometry args={[0.045, 20]} />

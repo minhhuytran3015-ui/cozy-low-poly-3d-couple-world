@@ -84,6 +84,15 @@
   line-height: 1;
 }
 
+.hud-online-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 6px rgba(46, 204, 113, 0.75);
+  flex-shrink: 0;
+}
+
 .hud-tab-hint {
   display: flex;
   align-items: center;
@@ -202,9 +211,14 @@
   transform: scale(0.95);
 }
 
+.hud-pill-btn.mp-online {
+  border-color: rgba(46, 204, 113, 0.55);
+  background: rgba(242, 253, 247, 0.92);
+}
+
 @media (max-width: 640px) {
   .hud-top-right {
-    top: max(12px, env(safe-area-inset-top, 12px));
+    top: calc(max(12px, env(safe-area-inset-top, 12px)) + 48px);
     right: max(12px, env(safe-area-inset-right, 12px));
     gap: 6px;
   }
@@ -212,7 +226,7 @@
   .hud-pill-btn {
     height: 36px;
     padding: 0 10px;
-    font-size: 0.75rem;
+    font-size: 0.74rem;
   }
 
   .hud-mode-label,
@@ -227,12 +241,18 @@
   }
 
   .hud-avatar-btn {
-    padding: 5px 8px;
-    font-size: 0.72rem;
+    padding: 5px 7px;
+    font-size: 0.7rem;
     gap: 4px;
   }
 
   .hud-avatar-icon {
-    font-size: 0.95rem;
+    font-size: 0.92rem;
+  }
+
+  .hud-pill-btn {
+    height: 34px;
+    padding: 0 8px;
+    font-size: 0.72rem;
   }
 }

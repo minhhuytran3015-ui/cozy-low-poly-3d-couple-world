@@ -6,6 +6,7 @@ import ControlHUD from './components/ui/ControlHUD';
 import InteractionPrompt from './components/ui/InteractionPrompt';
 import TouchControls from './components/ui/TouchControls';
 import GalleryDrawer from './components/ui/GalleryDrawer';
+import MultiplayerModal from './components/ui/MultiplayerModal';
 import MemoryViewer from './components/gallery/MemoryViewer';
 import type { CharacterType } from './components/character/types';
 import type { CameraControlHandle } from './components/camera/FollowCamera';
@@ -13,6 +14,7 @@ import { memories } from './data/memories';
 import type { Memory } from './data/memories';
 import useKeyboardControls from './hooks/useKeyboardControls';
 import useDeviceMode from './hooks/useDeviceMode';
+import useMultiplayer from './hooks/useMultiplayer';
 
 export const App: React.FC = () => {
   const [hasEntered, setHasEntered] = useState<boolean>(false);
@@ -20,18 +22,35 @@ export const App: React.FC = () => {
   const [nearbyMemory, setNearbyMemory] = useState<Memory | null>(null);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState<boolean>(false);
+  const [isMultiplayerOpen, setIsMultiplayerOpen] = useState<boolean>(false);
 
   const cameraControlRef = useRef<CameraControlHandle | null>(null);
   const { inputMode, toggleInputMode } = useDeviceMode();
 
-  const isOverlayOpen = !!selectedMemory || isGalleryOpen;
+  const multiplayer = useMultiplayer({
+    activeCharacter,
+    onAssignCharacter: setActiveCharacter,
+  });
 
-  const handleSwitchCharacter = useCallback((newType?: CharacterType) => {
-    setActiveCharacter((prev) => {
-      if (newType) return newType;
-      return prev === 'boy' ? 'girl' : 'boy';
-    });
-  }, []);
+  const isOverlayOpen = !!selectedMemory || isGalleryOpen || isMultiplayerOpen;
+
+  const handleSwitchCharacter = useCallback(
+    (newType?: CharacterType) => {
+      // When playing together in real time, switching to partner's tab swaps roles cleanly
+      if (multiplayer.isPartnerOnline) {
+        if (!newType || newType !== activeCharacter) {
+          multiplayer.swapRoles();
+        }
+        return;
+      }
+
+      setActiveCharacter((prev) => {
+        if (newType) return newType;
+        return prev === 'boy' ? 'girl' : 'boy';
+      });
+    },
+    [multiplayer, activeCharacter]
+  );
 
   const handleOpenMemory = useCallback((memory: Memory) => {
     setSelectedMemory(memory);
@@ -60,7 +79,7 @@ export const App: React.FC = () => {
 
   const keysRef = useKeyboardControls({
     onTabPress: () => {
-      if (!isOverlayOpen) {
+      if (!isOverlayOpen && !multiplayer.isPartnerOnline) {
         handleSwitchCharacter();
       }
     },
@@ -84,6 +103,11 @@ export const App: React.FC = () => {
         onOpenMemory={handleOpenMemory}
         isViewerOpen={isOverlayOpen}
         cameraControlRef={cameraControlRef}
+        isPartnerOnline={multiplayer.isPartnerOnline}
+        remoteStateRef={multiplayer.remoteStateRef}
+        onSendLocalState={multiplayer.sendLocalState}
+        boyEmote={multiplayer.emotes.boy}
+        girlEmote={multiplayer.emotes.girl}
       />
 
       {/* Responsive HUD (Phone / iPad / Desktop) */}
@@ -93,6 +117,9 @@ export const App: React.FC = () => {
         inputMode={inputMode}
         onToggleInputMode={toggleInputMode}
         onOpenGallery={() => setIsGalleryOpen(true)}
+        onOpenMultiplayer={() => setIsMultiplayerOpen(true)}
+        onSendEmote={multiplayer.sendEmote}
+        multiplayerStatus={multiplayer.status}
         memoryCount={memories.length}
         cameraControlRef={cameraControlRef}
         visible={hasEntered && !isOverlayOpen}
@@ -119,6 +146,20 @@ export const App: React.FC = () => {
         open={isGalleryOpen}
         onClose={() => setIsGalleryOpen(false)}
         onSelectMemory={handleOpenMemory}
+      />
+
+      {/* Real-time Multiplayer Invite & Room Modal */}
+      <MultiplayerModal
+        open={isMultiplayerOpen}
+        onClose={() => setIsMultiplayerOpen(false)}
+        roomCode={multiplayer.roomCode}
+        inviteUrl={multiplayer.inviteUrl}
+        status={multiplayer.status}
+        errorMsg={multiplayer.errorMsg}
+        activeCharacter={activeCharacter}
+        onCreateRoom={multiplayer.createRoom}
+        onLeaveRoom={multiplayer.leaveRoom}
+        onSwapRoles={multiplayer.swapRoles}
       />
 
       {/* Memory Viewer Modal (Swipe / Arrow / Esc) */}

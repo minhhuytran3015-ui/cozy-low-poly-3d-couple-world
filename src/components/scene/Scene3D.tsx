@@ -10,6 +10,7 @@ import MemoryGallery from '../gallery/MemoryGallery';
 import MemoryInteraction from '../gallery/MemoryInteraction';
 import type { CharacterType } from '../character/types';
 import type { KeyboardState } from '../../hooks/useKeyboardControls';
+import type { CharacterSyncState, EmoteType } from '../../hooks/useMultiplayer';
 import type { Memory } from '../../data/memories';
 
 interface Scene3DProps {
@@ -22,6 +23,11 @@ interface Scene3DProps {
   onOpenMemory: (memory: Memory) => void;
   isViewerOpen?: boolean;
   cameraControlRef?: React.MutableRefObject<CameraControlHandle | null>;
+  isPartnerOnline?: boolean;
+  remoteStateRef?: React.MutableRefObject<CharacterSyncState | null>;
+  onSendLocalState?: (state: CharacterSyncState) => void;
+  boyEmote?: EmoteType | null;
+  girlEmote?: EmoteType | null;
 }
 
 export const Scene3D: React.FC<Scene3DProps> = ({
@@ -34,6 +40,11 @@ export const Scene3D: React.FC<Scene3DProps> = ({
   onOpenMemory,
   isViewerOpen = false,
   cameraControlRef,
+  isPartnerOnline = false,
+  remoteStateRef,
+  onSendLocalState,
+  boyEmote = null,
+  girlEmote = null,
 }) => {
   // Shared ref for the active character's current position to drive FollowCamera & Interaction
   const targetPosRef = useRef(new THREE.Vector3(-1.2, 0, 0));
@@ -106,6 +117,11 @@ export const Scene3D: React.FC<Scene3DProps> = ({
           onTargetPositionChange={handleTargetPositionChange}
           keysRef={keysRef}
           enabled={isEntered && !isViewerOpen}
+          isPartnerOnline={isPartnerOnline}
+          remoteStateRef={remoteStateRef}
+          onSendLocalState={onSendLocalState}
+          boyEmote={boyEmote}
+          girlEmote={girlEmote}
         />
 
         {/* Soft ground shadow receiver below the room */}
