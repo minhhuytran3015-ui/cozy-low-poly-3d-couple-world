@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import type { CharacterType } from '../character/types';
-import type { MultiplayerStatus } from '../../hooks/useMultiplayer';
+import type { MultiplayerStatus, TransportKind } from '../../hooks/useMultiplayer';
 import { characterConfig } from '../../data/characterConfig';
 import '../../styles/viewer.css';
 
 interface MultiplayerModalProps {
   open: boolean;
   onClose: () => void;
+  transport: TransportKind;
   roomCode: string | null;
   inviteUrl: string | null;
   status: MultiplayerStatus;
   errorMsg: string | null;
   activeCharacter: CharacterType;
   onCreateRoom: (customCode?: string) => string;
+  onRetry: () => void;
   onLeaveRoom: () => void;
   onSwapRoles: () => void;
 }
@@ -22,12 +24,14 @@ const ROOM_INPUT_REGEX = /^[a-zA-Z0-9_-]{4,24}$/;
 export const MultiplayerModal: React.FC<MultiplayerModalProps> = ({
   open,
   onClose,
+  transport,
   roomCode,
   inviteUrl,
   status,
   errorMsg,
   activeCharacter,
   onCreateRoom,
+  onRetry,
   onLeaveRoom,
   onSwapRoles,
 }) => {
@@ -116,7 +120,7 @@ export const MultiplayerModal: React.FC<MultiplayerModalProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="memory-card" style={{ maxWidth: '460px', padding: '24px' }}>
+      <div className="memory-card" style={{ maxWidth: '470px', padding: '24px' }}>
         <button
           type="button"
           className="memory-close-btn"
@@ -126,15 +130,24 @@ export const MultiplayerModal: React.FC<MultiplayerModalProps> = ({
           &times;
         </button>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <div>
-            <span className="memory-tag" style={{ marginBottom: '8px' }}>
-              💞 Real-time Couple Mode
-            </span>
-            <h2 className="memory-title" style={{ fontSize: '1.4rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+              <span className="memory-tag">💞 Real-time Couple Mode</span>
+              <span
+                className="memory-tag"
+                style={{
+                  background: transport === 'supabase' ? '#eafaf1' : '#f4ece4',
+                  color: transport === 'supabase' ? '#2c7a4b' : '#7d6b5e',
+                }}
+              >
+                {transport === 'supabase' ? '☁️ Relay xuyên 4G/Wi-Fi' : '📡 P2P (Cùng mạng / STUN)'}
+              </span>
+            </div>
+            <h2 className="memory-title" style={{ fontSize: '1.38rem' }}>
               Chơi Chung Thời Gian Thực
             </h2>
-            <p className="memory-desc" style={{ fontSize: '0.9rem', marginTop: '4px' }}>
+            <p className="memory-desc" style={{ fontSize: '0.88rem', marginTop: '4px' }}>
               Gửi link phòng cho người ấy — khi bên kia di chuyển, bạn sẽ thấy nhân vật di chuyển ngay trên màn hình!
             </p>
           </div>
@@ -220,26 +233,48 @@ export const MultiplayerModal: React.FC<MultiplayerModalProps> = ({
               <div
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: 'flex-start',
                   gap: '10px',
-                  padding: '10px 14px',
+                  padding: '11px 14px',
                   borderRadius: '14px',
                   backgroundColor: statusMeta.bg,
-                  fontSize: '0.86rem',
+                  fontSize: '0.84rem',
                   fontWeight: 700,
                   color: '#3e342e',
+                  lineHeight: 1.45,
                 }}
               >
                 <span
                   style={{
                     width: '10px',
                     height: '10px',
+                    marginTop: '5px',
                     borderRadius: '50%',
                     backgroundColor: statusMeta.dot,
                     flexShrink: 0,
                   }}
                 />
-                <span>{statusMeta.text}</span>
+                <div style={{ flex: 1 }}>
+                  <div>{statusMeta.text}</div>
+                  {status === 'error' && (
+                    <button
+                      type="button"
+                      onClick={onRetry}
+                      style={{
+                        marginTop: '8px',
+                        padding: '6px 12px',
+                        borderRadius: '10px',
+                        background: '#ffffff',
+                        border: '1px solid #e2b4b0',
+                        color: '#a93226',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      🔄 Thử kết nối lại
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Character Assignment */}

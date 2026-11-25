@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Peer from 'peerjs';
 import type { DataConnection } from 'peerjs';
+import { createClient } from '@supabase/supabase-js';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { CharacterType } from '../components/character/types';
 
 export type MultiplayerStatus = 'idle' | 'connecting' | 'waiting' | 'connected' | 'error';
 export type EmoteType = 'heart' | 'wave';
+export type TransportKind = 'supabase' | 'webrtc';
 
 export interface CharacterSyncState {
   character: CharacterType;
@@ -26,13 +29,41 @@ type IncomingPacket =
 const ROOM_CODE_REGEX = /^[a-zA-Z0-9_-]{4,24}$/;
 const ALLOWED_EMOTES: readonly EmoteType[] = ['heart', 'wave'];
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || '';
+const HAS_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+const supabaseClient = HAS_SUPABASE
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    realtime: { params: { eventsPerSecond: 30 } },
+  })
+  : null;
+
+function buildIceServers(): RTCIceServer[] {
+  const servers: RTCIceServer[] = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+  ];
+
+  const turnUrls = import.meta.env.VITE_TURN_URLS?.trim();
+  const turnUser = import.meta.env.VITE_TURN_USERNAME?.trim();
+  const turnCred = import.meta.env.VITE_TURN_CREDENTIAL?.trim();
+
+  if (turnUrls && turnUser && turnCred) {
+    servers.push({
+      urls: turnUrls.split(',').map((u: string) => u.trim()).filter(Boolean),
+      username: turnUser,
+      credential: turnCred,
+    });
+  }
+
+  return servers;
+}
+
 const PEER_CONFIG = {
   config: {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun.cloudflare.com:3478' },
-    ],
+    iceServers: buildIceServers(),
   },
 };
 
@@ -45,6 +76,12 @@ function generateRoomCode(): string {
     code += alphabet[bytes[i] % alphabet.length];
   }
   return code;
+}
+
+function generateClientId(): string {
+  const bytes = new Uint8Array(8);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 function getInitialRoomFromUrl(): string | null {
@@ -130,20 +167,20 @@ export const useMultiplayer = ({
   activeCharacter,
   onAssignCharacter,
 }: UseMultiplayerOptions) => {
+  const transport: TransportKind = HAS_SUPABASE ? 'supabase' : 'webrtc';
   const [roomCode, setRoomCode] = useState<string | null>(getInitialRoomFromUrl);
   const [status, setStatus] = useState<MultiplayerStatus>(() =>
     getInitialRoomFromUrl() ? 'connecting' : 'idle'
   );
   const [isHost, setIsHost] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [reconnectTick, setReconnectTick] = useState<number>(0);
 
-  // Ephemeral emotes displayed above character heads
   const [emotes, setEmotes] = useState<{ boy: EmoteType | null; girl: EmoteType | null }>({
     boy: null,
     girl: null,
   });
 
-  // High-frequency state refs (zero re-render thrashing)
   const remoteStateRef = useRef<CharacterSyncState | null>(null);
   const lastLocalStateRef = useRef<CharacterSyncState | null>(null);
   const lastSentAtRef = useRef<number>(0);
@@ -152,6 +189,9 @@ export const useMultiplayer = ({
 
   const peerRef = useRef<Peer | null>(null);
   const connRef = useRef<DataConnection | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const clientIdRef = useRef<string>(generateClientId());
+
   const isHostRef = useRef<boolean>(false);
   const activeCharRef = useRef<CharacterType>(activeCharacter);
   const onAssignCharRef = useRef(onAssignCharacter);
@@ -194,16 +234,28 @@ export const useMultiplayer = ({
       setStatus('connecting');
       syncUrlRoom(nextCode);
       setRoomCode(nextCode);
+      setReconnectTick((t) => t + 1);
       return nextCode;
     },
     [syncUrlRoom]
   );
+
+  const retryConnection = useCallback(() => {
+    if (!roomCode) return;
+    setErrorMsg(null);
+    setStatus('connecting');
+    setReconnectTick((t) => t + 1);
+  }, [roomCode]);
 
   const leaveRoom = useCallback(() => {
     connRef.current?.close();
     connRef.current = null;
     peerRef.current?.destroy();
     peerRef.current = null;
+    if (channelRef.current && supabaseClient) {
+      supabaseClient.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
     remoteStateRef.current = null;
     isHostRef.current = false;
     setIsHost(false);
@@ -213,18 +265,169 @@ export const useMultiplayer = ({
     setRoomCode(null);
   }, [syncUrlRoom]);
 
-  // Core PeerJS host/guest lifecycle
+  const transmitPacket = useCallback((packet: Record<string, unknown>) => {
+    if (supabaseClient && channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'packet',
+        payload: { ...packet, senderId: clientIdRef.current },
+      });
+      return;
+    }
+
+    const conn = connRef.current;
+    if (conn && conn.open) {
+      conn.send(packet);
+    }
+  }, []);
+
+  // Room connection lifecycle: Supabase Realtime (when configured) OR PeerJS WebRTC fallback
   useEffect(() => {
     if (!roomCode) return;
 
     let cancelled = false;
     let retryTimer: number | null = null;
+    let iceTimeoutTimer: number | null = null;
+
+    const handleIncomingPacket = (packet: IncomingPacket, replyFn: (pkt: Record<string, unknown>) => void) => {
+      switch (packet.type) {
+        case 'hello':
+          if (isHostRef.current) {
+            replyFn({
+              type: 'welcome',
+              hostCharacter: activeCharRef.current,
+              state: lastLocalStateRef.current ?? undefined,
+            });
+          }
+          break;
+
+        case 'welcome': {
+          const guestChar: CharacterType = packet.hostCharacter === 'boy' ? 'girl' : 'boy';
+          onAssignCharRef.current(guestChar);
+          if (packet.state) {
+            remoteStateRef.current = packet.state;
+          }
+          setErrorMsg(null);
+          setStatus('connected');
+          break;
+        }
+
+        case 'state':
+          remoteStateRef.current = packet.state;
+          break;
+
+        case 'emote':
+          triggerLocalEmoteDisplay(packet.character, packet.emote);
+          break;
+
+        case 'swap_role': {
+          const nextChar: CharacterType = isHostRef.current
+            ? packet.hostCharacter
+            : packet.hostCharacter === 'boy'
+              ? 'girl'
+              : 'boy';
+          onAssignCharRef.current(nextChar);
+          remoteStateRef.current = null;
+          break;
+        }
+      }
+    };
+
+    // =========================================================================
+    // PATH A: Supabase Realtime Broadcast + Presence (Works across 4G/5G/NAT)
+    // =========================================================================
+    if (supabaseClient) {
+      const clientId = clientIdRef.current;
+      const joinedAt = Date.now();
+      const channel = supabaseClient.channel(`hdtm-room-${roomCode}`, {
+        config: {
+          broadcast: { self: false },
+          presence: { key: clientId },
+        },
+      });
+      channelRef.current = channel;
+
+      const sendViaSupabase = (pkt: Record<string, unknown>) => {
+        channel.send({
+          type: 'broadcast',
+          event: 'packet',
+          payload: { ...pkt, senderId: clientId },
+        });
+      };
+
+      channel.on('broadcast', { event: 'packet' }, ({ payload }) => {
+        if (cancelled) return;
+        const packet = parsePacket(payload);
+        if (!packet) return;
+        handleIncomingPacket(packet, sendViaSupabase);
+      });
+
+      channel.on('presence', { event: 'sync' }, () => {
+        if (cancelled) return;
+        const state = channel.presenceState<{ joinedAt: number; clientId: string }>();
+        const entries = Object.entries(state)
+          .map(([key, metas]) => ({
+            key,
+            joinedAt: metas[0]?.joinedAt ?? Number.MAX_SAFE_INTEGER,
+          }))
+          .sort((a, b) => a.joinedAt - b.joinedAt || a.key.localeCompare(b.key));
+
+        if (entries.length === 0) return;
+
+        const amHost = entries[0].key === clientId;
+        isHostRef.current = amHost;
+        setIsHost(amHost);
+
+        if (entries.length >= 2) {
+          setErrorMsg(null);
+          setStatus('connected');
+          if (amHost) {
+            sendViaSupabase({
+              type: 'welcome',
+              hostCharacter: activeCharRef.current,
+              state: lastLocalStateRef.current ?? undefined,
+            });
+          } else {
+            sendViaSupabase({ type: 'hello' });
+          }
+        } else {
+          remoteStateRef.current = null;
+          setStatus('waiting');
+        }
+      });
+
+      channel.subscribe(async (subStatus) => {
+        if (cancelled) return;
+        if (subStatus === 'SUBSCRIBED') {
+          await channel.track({ clientId, joinedAt });
+        } else if (subStatus === 'CHANNEL_ERROR' || subStatus === 'TIMED_OUT') {
+          setStatus('error');
+          setErrorMsg('Không thể kết nối máy chủ Supabase Realtime. Hãy kiểm tra URL/Key.');
+        }
+      });
+
+      return () => {
+        cancelled = true;
+        if (channelRef.current) {
+          supabaseClient.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
+      };
+    }
+
+    // =========================================================================
+    // PATH B: PeerJS WebRTC P2P Fallback (Same Wi-Fi or TURN-enabled)
+    // =========================================================================
     const hostPeerId = `hdtm-v1-${roomCode}-host`;
 
     const cleanupInstances = () => {
       if (retryTimer) {
         window.clearTimeout(retryTimer);
         retryTimer = null;
+      }
+      if (iceTimeoutTimer) {
+        window.clearTimeout(iceTimeoutTimer);
+        iceTimeoutTimer = null;
       }
       connRef.current?.close();
       connRef.current = null;
@@ -238,8 +441,35 @@ export const useMultiplayer = ({
       }
       connRef.current = conn;
 
+      // Monitor WebRTC ICE failure / timeout so distant 4G users aren't stuck silently
+      iceTimeoutTimer = window.setTimeout(() => {
+        if (cancelled || conn.open) return;
+        setStatus('error');
+        setErrorMsg(
+          '2 thiết bị ở khác mạng/4G nên kết nối P2P bị nhà mạng chặn. Hãy cấu hình Supabase Realtime (miễn phí) hoặc TURN server để chơi xuyên mọi mạng.'
+        );
+      }, 11000);
+
+      const pc = conn.peerConnection;
+      if (pc) {
+        pc.addEventListener('iceconnectionstatechange', () => {
+          if (cancelled) return;
+          if (pc.iceConnectionState === 'failed') {
+            if (iceTimeoutTimer) window.clearTimeout(iceTimeoutTimer);
+            setStatus('error');
+            setErrorMsg(
+              'Kết nối P2P bị tường lửa 4G/NAT chặn. Hãy dùng Supabase Realtime để 2 máy ở xa kết nối 100% ổn định.'
+            );
+          }
+        });
+      }
+
       conn.on('open', () => {
         if (cancelled) return;
+        if (iceTimeoutTimer) {
+          window.clearTimeout(iceTimeoutTimer);
+          iceTimeoutTimer = null;
+        }
         setErrorMsg(null);
         setStatus('connected');
 
@@ -258,51 +488,12 @@ export const useMultiplayer = ({
         if (cancelled) return;
         const packet = parsePacket(rawData);
         if (!packet) return;
-
-        switch (packet.type) {
-          case 'hello':
-            if (isHostRef.current) {
-              conn.send({
-                type: 'welcome',
-                hostCharacter: activeCharRef.current,
-                state: lastLocalStateRef.current ?? undefined,
-              });
-            }
-            break;
-
-          case 'welcome': {
-            const guestChar: CharacterType = packet.hostCharacter === 'boy' ? 'girl' : 'boy';
-            onAssignCharRef.current(guestChar);
-            if (packet.state) {
-              remoteStateRef.current = packet.state;
-            }
-            setStatus('connected');
-            break;
-          }
-
-          case 'state':
-            remoteStateRef.current = packet.state;
-            break;
-
-          case 'emote':
-            triggerLocalEmoteDisplay(packet.character, packet.emote);
-            break;
-
-          case 'swap_role': {
-            const nextChar: CharacterType = isHostRef.current
-              ? packet.hostCharacter
-              : packet.hostCharacter === 'boy'
-              ? 'girl'
-              : 'boy';
-            onAssignCharRef.current(nextChar);
-            remoteStateRef.current = null;
-            break;
-          }
-        }
+        handleIncomingPacket(packet, (pkt) => conn.send(pkt));
       });
 
       conn.on('close', () => {
         if (cancelled) return;
+        if (iceTimeoutTimer) window.clearTimeout(iceTimeoutTimer);
         if (connRef.current === conn) {
           connRef.current = null;
         }
@@ -310,7 +501,6 @@ export const useMultiplayer = ({
         if (isHostRef.current) {
           setStatus('waiting');
         } else {
-          // Host disconnected -> retry claiming host or rejoining shortly
           setStatus('connecting');
           retryTimer = window.setTimeout(() => {
             if (!cancelled) startHostOrGuest();
@@ -320,7 +510,8 @@ export const useMultiplayer = ({
 
       conn.on('error', () => {
         if (cancelled) return;
-        setErrorMsg('Kết nối với người kia bị gián đoạn, đang thử lại...');
+        setStatus('error');
+        setErrorMsg('Kết nối P2P gặp sự cố. Bấm thử lại hoặc cấu hình Supabase Realtime.');
       });
     };
 
@@ -343,7 +534,6 @@ export const useMultiplayer = ({
       guestPeer.on('error', (err) => {
         if (cancelled) return;
         if (err.type === 'peer-unavailable') {
-          // Host just left; wait briefly then try becoming host
           retryTimer = window.setTimeout(() => {
             if (!cancelled) startHostOrGuest();
           }, 900);
@@ -378,7 +568,6 @@ export const useMultiplayer = ({
       hostPeer.on('error', (err) => {
         if (cancelled) return;
         if (err.type === 'unavailable-id') {
-          // Room host already exists -> join as guest
           startGuest();
         } else {
           setStatus('error');
@@ -393,69 +582,71 @@ export const useMultiplayer = ({
       cancelled = true;
       cleanupInstances();
     };
-  }, [roomCode, triggerLocalEmoteDisplay]);
+  }, [roomCode, reconnectTick, triggerLocalEmoteDisplay]);
 
-  const sendLocalState = useCallback((state: CharacterSyncState) => {
-    lastLocalStateRef.current = state;
-    const conn = connRef.current;
-    if (!conn || !conn.open) return;
+  const sendLocalState = useCallback(
+    (state: CharacterSyncState) => {
+      lastLocalStateRef.current = state;
 
-    const now = performance.now();
-    const stateChanged =
-      state.isMoving !== lastSentMovingRef.current ||
-      state.isSprinting !== lastSentSprintRef.current;
+      if (!supabaseClient && (!connRef.current || !connRef.current.open)) {
+        return;
+      }
+      if (supabaseClient && !channelRef.current) {
+        return;
+      }
 
-    if (!stateChanged && !state.isMoving && now - lastSentAtRef.current < 350) {
-      return;
-    }
-    if (!stateChanged && now - lastSentAtRef.current < 36) {
-      return;
-    }
+      const now = performance.now();
+      const stateChanged =
+        state.isMoving !== lastSentMovingRef.current ||
+        state.isSprinting !== lastSentSprintRef.current;
 
-    lastSentAtRef.current = now;
-    lastSentMovingRef.current = state.isMoving;
-    lastSentSprintRef.current = state.isSprinting;
+      if (!stateChanged && !state.isMoving && now - lastSentAtRef.current < 350) {
+        return;
+      }
+      if (!stateChanged && now - lastSentAtRef.current < 36) {
+        return;
+      }
 
-    conn.send({
-      type: 'state',
-      state: {
-        character: state.character,
-        x: Number(state.x.toFixed(3)),
-        z: Number(state.z.toFixed(3)),
-        rotation: Number(state.rotation.toFixed(3)),
-        isMoving: state.isMoving,
-        isSprinting: state.isSprinting,
-      },
-    });
-  }, []);
+      lastSentAtRef.current = now;
+      lastSentMovingRef.current = state.isMoving;
+      lastSentSprintRef.current = state.isSprinting;
+
+      transmitPacket({
+        type: 'state',
+        state: {
+          character: state.character,
+          x: Number(state.x.toFixed(3)),
+          z: Number(state.z.toFixed(3)),
+          rotation: Number(state.rotation.toFixed(3)),
+          isMoving: state.isMoving,
+          isSprinting: state.isSprinting,
+        },
+      });
+    },
+    [transmitPacket]
+  );
 
   const sendEmote = useCallback(
     (emote: EmoteType) => {
       const char = activeCharRef.current;
       triggerLocalEmoteDisplay(char, emote);
-      const conn = connRef.current;
-      if (conn && conn.open) {
-        conn.send({ type: 'emote', character: char, emote });
-      }
+      transmitPacket({ type: 'emote', character: char, emote });
     },
-    [triggerLocalEmoteDisplay]
+    [triggerLocalEmoteDisplay, transmitPacket]
   );
 
   const swapRoles = useCallback(() => {
-    const conn = connRef.current;
     const nextLocal: CharacterType = activeCharRef.current === 'boy' ? 'girl' : 'boy';
     onAssignCharRef.current(nextLocal);
     remoteStateRef.current = null;
 
-    if (conn && conn.open) {
-      const nextHostChar: CharacterType = isHostRef.current
-        ? nextLocal
-        : nextLocal === 'boy'
+    const nextHostChar: CharacterType = isHostRef.current
+      ? nextLocal
+      : nextLocal === 'boy'
         ? 'girl'
         : 'boy';
-      conn.send({ type: 'swap_role', hostCharacter: nextHostChar });
-    }
-  }, []);
+    transmitPacket({ type: 'swap_role', hostCharacter: nextHostChar });
+  }, [transmitPacket]);
 
   const inviteUrl =
     typeof window !== 'undefined' && roomCode
@@ -463,6 +654,7 @@ export const useMultiplayer = ({
       : null;
 
   return {
+    transport,
     roomCode,
     inviteUrl,
     status,
@@ -472,6 +664,7 @@ export const useMultiplayer = ({
     remoteStateRef,
     emotes,
     createRoom,
+    retryConnection,
     leaveRoom,
     sendLocalState,
     sendEmote,

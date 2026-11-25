@@ -152,12 +152,14 @@ export const App: React.FC = () => {
       <MultiplayerModal
         open={isMultiplayerOpen}
         onClose={() => setIsMultiplayerOpen(false)}
+        transport={multiplayer.transport}
         roomCode={multiplayer.roomCode}
         inviteUrl={multiplayer.inviteUrl}
         status={multiplayer.status}
         errorMsg={multiplayer.errorMsg}
         activeCharacter={activeCharacter}
         onCreateRoom={multiplayer.createRoom}
+        onRetry={multiplayer.retryConnection}
         onLeaveRoom={multiplayer.leaveRoom}
         onSwapRoles={multiplayer.swapRoles}
       />
