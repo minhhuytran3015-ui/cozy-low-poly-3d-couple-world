@@ -24,7 +24,7 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
   const pointerRef = useRef<THREE.Mesh>(null);
 
   // Floating animation + pulse
-  useFrame((_, delta) => {
+  useFrame(() => {
     if (!groupRef.current) return;
 
     // Gentle floating bob
@@ -39,7 +39,6 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
     }
   });
 
-  const themeColor = new THREE.Color(config.themeColor);
   const bgColor = isActive ? '#ffffff' : '#faf8f6';
   const borderColor = config.themeColor;
 
