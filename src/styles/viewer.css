@@ -20,6 +20,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -45,6 +46,7 @@
     opacity: 0;
     transform: translateY(24px) scale(0.97);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -75,6 +77,45 @@
   background: #ffffff;
   color: #38302b;
   transform: scale(1.08);
+}
+
+.memory-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 8;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(210, 195, 180, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #4f443d;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.memory-nav-btn:hover {
+  background: #ffffff;
+  transform: translateY(-50%) scale(1.08);
+}
+
+.memory-nav-btn:active {
+  transform: translateY(-50%) scale(0.94);
+}
+
+.memory-nav-btn.prev {
+  left: 12px;
+}
+
+.memory-nav-btn.next {
+  right: 12px;
 }
 
 .memory-media-container {
@@ -185,14 +226,40 @@
 }
 
 @media (max-width: 640px) {
+  .memory-backdrop {
+    padding: 12px;
+  }
+
   .memory-card {
-    max-width: 95%;
+    max-width: 100%;
+    max-height: 92dvh;
     border-radius: 20px;
+    overflow-y: auto;
   }
-  .memory-info-container {
-    padding: 18px 20px 22px;
+
+  .memory-media-container {
+    min-height: 220px;
+    max-height: 52dvh;
   }
-  .memory-title {
+
+  .memory-close-btn {
+    width: 42px;
+    height: 42px;
+    top: 12px;
+    right: 12px;
+  }
+
+  .memory-nav-btn {
+    width: 36px;
+    height: 36px;
     font-size: 1.35rem;
+  }
+
+  .memory-info-container {
+    padding: 16px 18px 20px;
+  }
+
+  .memory-title {
+    font-size: 1.25rem;
   }
 }

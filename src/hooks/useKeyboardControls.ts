@@ -6,6 +6,11 @@ export interface KeyboardState {
   left: boolean;
   right: boolean;
   sprint: boolean;
+  // Analog touch joystick normalized vector (-1..1, +joyY = forward, +joyX = right)
+  joyX: number;
+  joyY: number;
+  // Dedicated touch sprint button state
+  touchSprint: boolean;
 }
 
 interface UseKeyboardControlsOptions {
@@ -23,6 +28,9 @@ export const useKeyboardControls = ({
     left: false,
     right: false,
     sprint: false,
+    joyX: 0,
+    joyY: 0,
+    touchSprint: false,
   });
 
   // Keep a stable ref to onTabPress so event listener does not recreate
@@ -33,14 +41,15 @@ export const useKeyboardControls = ({
 
   useEffect(() => {
     if (!enabled) {
-      // Reset keys if disabled
-      keysRef.current = {
-        forward: false,
-        backward: false,
-        left: false,
-        right: false,
-        sprint: false,
-      };
+      // Reset all input when disabled
+      keysRef.current.forward = false;
+      keysRef.current.backward = false;
+      keysRef.current.left = false;
+      keysRef.current.right = false;
+      keysRef.current.sprint = false;
+      keysRef.current.joyX = 0;
+      keysRef.current.joyY = 0;
+      keysRef.current.touchSprint = false;
       return;
     }
 
@@ -116,14 +125,15 @@ export const useKeyboardControls = ({
     };
 
     const handleWindowBlur = () => {
-      // Reset all keys on blur to avoid stuck movement keys
-      keysRef.current = {
-        forward: false,
-        backward: false,
-        left: false,
-        right: false,
-        sprint: false,
-      };
+      // Reset all inputs on blur to avoid stuck movement
+      keysRef.current.forward = false;
+      keysRef.current.backward = false;
+      keysRef.current.left = false;
+      keysRef.current.right = false;
+      keysRef.current.sprint = false;
+      keysRef.current.joyX = 0;
+      keysRef.current.joyY = 0;
+      keysRef.current.touchSprint = false;
     };
 
     window.addEventListener('keydown', handleKeyDown);

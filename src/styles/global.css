@@ -4,6 +4,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -11,7 +12,9 @@ body,
 #root {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
+  overscroll-behavior: none;
   position: fixed;
   top: 0;
   left: 0;
@@ -20,6 +23,15 @@ body,
   color: #3f3935;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.app-shell {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  position: relative;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 button {
@@ -34,10 +46,12 @@ button {
 .canvas-container {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   position: absolute;
   top: 0;
   left: 0;
   z-index: 1;
+  touch-action: none;
 }
 
 canvas {
@@ -45,4 +59,5 @@ canvas {
   width: 100% !important;
   height: 100% !important;
   outline: none;
+  touch-action: none;
 }

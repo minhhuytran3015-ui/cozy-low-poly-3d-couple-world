@@ -1,23 +1,30 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import './styles/global.css';
 import IntroScreen from './components/intro/IntroScreen';
 import Scene3D from './components/scene/Scene3D';
 import ControlHUD from './components/ui/ControlHUD';
 import InteractionPrompt from './components/ui/InteractionPrompt';
+import TouchControls from './components/ui/TouchControls';
+import GalleryDrawer from './components/ui/GalleryDrawer';
 import MemoryViewer from './components/gallery/MemoryViewer';
 import type { CharacterType } from './components/character/types';
+import type { CameraControlHandle } from './components/camera/FollowCamera';
+import { memories } from './data/memories';
 import type { Memory } from './data/memories';
 import useKeyboardControls from './hooks/useKeyboardControls';
+import useDeviceMode from './hooks/useDeviceMode';
 
 export const App: React.FC = () => {
   const [hasEntered, setHasEntered] = useState<boolean>(false);
   const [activeCharacter, setActiveCharacter] = useState<CharacterType>('boy');
-
-  // Currently approached memory (shows "E - Xem kỷ niệm" prompt)
   const [nearbyMemory, setNearbyMemory] = useState<Memory | null>(null);
-
-  // Currently opened memory in modal viewer (null when closed)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
+  const [isGalleryOpen, setIsGalleryOpen] = useState<boolean>(false);
+
+  const cameraControlRef = useRef<CameraControlHandle | null>(null);
+  const { inputMode, toggleInputMode } = useDeviceMode();
+
+  const isOverlayOpen = !!selectedMemory || isGalleryOpen;
 
   const handleSwitchCharacter = useCallback((newType?: CharacterType) => {
     setActiveCharacter((prev) => {
@@ -34,15 +41,30 @@ export const App: React.FC = () => {
     setSelectedMemory(null);
   }, []);
 
-  // Central keyboard listener for WASD movement and Tab switching
-  // Disabled when MemoryViewer is open to prevent moving while viewing memories
+  const selectedIndex = useMemo(() => {
+    if (!selectedMemory) return -1;
+    return memories.findIndex((m) => m.id === selectedMemory.id);
+  }, [selectedMemory]);
+
+  const handlePrevMemory = useCallback(() => {
+    if (selectedIndex < 0) return;
+    const prevIdx = (selectedIndex - 1 + memories.length) % memories.length;
+    setSelectedMemory(memories[prevIdx]);
+  }, [selectedIndex]);
+
+  const handleNextMemory = useCallback(() => {
+    if (selectedIndex < 0) return;
+    const nextIdx = (selectedIndex + 1) % memories.length;
+    setSelectedMemory(memories[nextIdx]);
+  }, [selectedIndex]);
+
   const keysRef = useKeyboardControls({
     onTabPress: () => {
-      if (!selectedMemory) {
+      if (!isOverlayOpen) {
         handleSwitchCharacter();
       }
     },
-    enabled: hasEntered && !selectedMemory,
+    enabled: hasEntered && !isOverlayOpen,
   });
 
   const handleEnterWorld = () => {
@@ -50,11 +72,8 @@ export const App: React.FC = () => {
   };
 
   return (
-    <main style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
-      {/* 
-        3D Scene with Room, 15 Photo Frames, Couple Characters, and FollowCamera.
-        Mounted beneath the Intro Screen.
-      */}
+    <main className="app-shell">
+      {/* 3D Scene */}
       <Scene3D
         isEntered={hasEntered}
         activeCharacter={activeCharacter}
@@ -63,30 +82,57 @@ export const App: React.FC = () => {
         activeMemory={nearbyMemory}
         onActiveMemoryChange={setNearbyMemory}
         onOpenMemory={handleOpenMemory}
-        isViewerOpen={!!selectedMemory}
+        isViewerOpen={isOverlayOpen}
+        cameraControlRef={cameraControlRef}
       />
 
-      {/* Control HUD: Active Character Badge & Controls Guide */}
+      {/* Responsive HUD (Phone / iPad / Desktop) */}
       <ControlHUD
         activeCharacter={activeCharacter}
         onSwitchCharacter={handleSwitchCharacter}
-        visible={hasEntered && !selectedMemory}
+        inputMode={inputMode}
+        onToggleInputMode={toggleInputMode}
+        onOpenGallery={() => setIsGalleryOpen(true)}
+        memoryCount={memories.length}
+        cameraControlRef={cameraControlRef}
+        visible={hasEntered && !isOverlayOpen}
       />
 
-      {/* Distance Proximity Interaction Prompt: "E - Xem kỷ niệm" */}
+      {/* Touch Controls (Analog Joystick, Sprint, Switch, Zoom) */}
+      <TouchControls
+        keysRef={keysRef}
+        cameraControlRef={cameraControlRef}
+        onSwitchCharacter={() => handleSwitchCharacter()}
+        visible={hasEntered && !isOverlayOpen && inputMode === 'touch'}
+      />
+
+      {/* Proximity Interaction Prompt */}
       <InteractionPrompt
         memory={nearbyMemory}
         onOpen={handleOpenMemory}
-        visible={hasEntered && !selectedMemory}
+        inputMode={inputMode}
+        visible={hasEntered && !isOverlayOpen}
       />
 
-      {/* Memory Viewer Modal (Image / Video player overlay) */}
+      {/* Quick Gallery Album Drawer */}
+      <GalleryDrawer
+        open={isGalleryOpen}
+        onClose={() => setIsGalleryOpen(false)}
+        onSelectMemory={handleOpenMemory}
+      />
+
+      {/* Memory Viewer Modal (Swipe / Arrow / Esc) */}
       <MemoryViewer
         memory={selectedMemory}
         onClose={handleCloseMemory}
+        onPrev={handlePrevMemory}
+        onNext={handleNextMemory}
+        currentIndex={selectedIndex >= 0 ? selectedIndex : undefined}
+        totalCount={memories.length}
+        inputMode={inputMode}
       />
 
-      {/* Intro Screen Overlay (fades out smoothly on enter) */}
+      {/* Intro Screen Overlay */}
       <IntroScreen onEnter={handleEnterWorld} />
     </main>
   );

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import Room from '../room/Room';
 import RoomCamera from '../camera/RoomCamera';
 import FollowCamera from '../camera/FollowCamera';
+import type { CameraControlHandle } from '../camera/FollowCamera';
 import CharacterManager from '../character/CharacterManager';
 import MemoryGallery from '../gallery/MemoryGallery';
 import MemoryInteraction from '../gallery/MemoryInteraction';
@@ -20,6 +21,7 @@ interface Scene3DProps {
   onActiveMemoryChange: (memory: Memory | null) => void;
   onOpenMemory: (memory: Memory) => void;
   isViewerOpen?: boolean;
+  cameraControlRef?: React.MutableRefObject<CameraControlHandle | null>;
 }
 
 export const Scene3D: React.FC<Scene3DProps> = ({
@@ -31,6 +33,7 @@ export const Scene3D: React.FC<Scene3DProps> = ({
   onActiveMemoryChange,
   onOpenMemory,
   isViewerOpen = false,
+  cameraControlRef,
 }) => {
   // Shared ref for the active character's current position to drive FollowCamera & Interaction
   const targetPosRef = useRef(new THREE.Vector3(-1.2, 0, 0));
@@ -72,6 +75,7 @@ export const Scene3D: React.FC<Scene3DProps> = ({
           <FollowCamera
             targetPosition={targetPosRef}
             enabled={!isViewerOpen}
+            controlRef={cameraControlRef}
           />
         )}
 

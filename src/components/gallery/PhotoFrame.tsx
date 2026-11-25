@@ -91,6 +91,8 @@ export const PhotoFrame: React.FC<PhotoFrameProps> = ({
       rotation={frameRot}
       onClick={(e) => {
         e.stopPropagation();
+        // Ignore accidental tap/click if user was dragging camera
+        if (e.delta > 6) return;
         if (onSelect) onSelect(memory);
       }}
       onPointerOver={(e) => {

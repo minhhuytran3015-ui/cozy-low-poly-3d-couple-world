@@ -81,20 +81,29 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
 
     camRight.current.crossVectors(camForward.current, upVec.current).normalize();
 
-    // 2. Accumulate movement input
-    moveDir.current.set(0, 0, 0);
-    if (keys.forward) moveDir.current.add(camForward.current);
-    if (keys.backward) moveDir.current.sub(camForward.current);
-    if (keys.right) moveDir.current.add(camRight.current);
-    if (keys.left) moveDir.current.sub(camRight.current);
+    // 2. Accumulate digital (keyboard) + analog (touch joystick) movement input
+    const digitalRight = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    const digitalForward = (keys.forward ? 1 : 0) - (keys.backward ? 1 : 0);
+    const rawRight = digitalRight + keys.joyX;
+    const rawForward = digitalForward + keys.joyY;
+    const rawMag = Math.hypot(rawRight, rawForward);
 
-    if (moveDir.current.lengthSq() > 0.0001) {
-      // Normalize to prevent diagonal sprint boost
-      moveDir.current.normalize();
+    if (rawMag > 0.08) {
+      const clampedMag = Math.min(1, rawMag);
+      const normRight = rawRight / rawMag;
+      const normForward = rawForward / rawMag;
 
-      const speed = keys.sprint ? 3.8 : 2.3;
+      moveDir.current
+        .set(0, 0, 0)
+        .addScaledVector(camForward.current, normForward)
+        .addScaledVector(camRight.current, normRight)
+        .normalize();
+
+      const joyMag = Math.hypot(keys.joyX, keys.joyY);
+      const isSprinting = keys.sprint || keys.touchSprint || joyMag > 0.9;
+      const speed = (isSprinting ? 3.8 : 2.3) * clampedMag;
       active.isMoving = true;
-      active.isSprinting = keys.sprint;
+      active.isSprinting = isSprinting;
 
       // Rotate character face towards move direction
       active.rotation = Math.atan2(moveDir.current.x, moveDir.current.z);

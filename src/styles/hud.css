@@ -18,6 +18,7 @@
     opacity: 0;
     transform: translateY(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -139,10 +140,99 @@
 
 @media (max-width: 640px) {
   .hud-container {
-    top: 12px;
-    left: 12px;
+    top: max(12px, env(safe-area-inset-top, 12px));
+    left: max(12px, env(safe-area-inset-left, 12px));
+    gap: 8px;
   }
+
+  .hud-card {
+    padding: 6px 8px;
+    border-radius: 16px;
+    gap: 8px;
+  }
+
+  .hud-avatar-btn {
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
+
   .hud-controls-card {
-    display: none; /* Keep clean on small mobile screens */
+    display: none;
+  }
+}
+
+/* Top-Right Quick Toolbar */
+.hud-top-right {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top, 20px));
+  right: max(20px, env(safe-area-inset-right, 20px));
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.hud-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 6px 18px rgba(150, 130, 110, 0.14);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #544840;
+  touch-action: manipulation;
+  transition: transform 0.18s ease, background-color 0.2s ease;
+}
+
+.hud-pill-btn:hover {
+  background: #ffffff;
+  transform: translateY(-1px);
+}
+
+.hud-pill-btn:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 640px) {
+  .hud-top-right {
+    top: max(12px, env(safe-area-inset-top, 12px));
+    right: max(12px, env(safe-area-inset-right, 12px));
+    gap: 6px;
+  }
+
+  .hud-pill-btn {
+    height: 36px;
+    padding: 0 10px;
+    font-size: 0.75rem;
+  }
+
+  .hud-mode-label,
+  .hud-album-label {
+    display: none;
+  }
+}
+
+@media (max-width: 440px) {
+  .hud-card {
+    padding: 4px 6px;
+  }
+
+  .hud-avatar-btn {
+    padding: 5px 8px;
+    font-size: 0.72rem;
+    gap: 4px;
+  }
+
+  .hud-avatar-icon {
+    font-size: 0.95rem;
   }
 }
