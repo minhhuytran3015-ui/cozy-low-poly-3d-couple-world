@@ -39,7 +39,7 @@ export function getMemoryPlaceholderTexture(memory: Memory): THREE.CanvasTexture
 
   const theme = colorThemes[memory.id] || {
     bg1: '#f7f2eb',
-    bg2: '#eadaa',
+    bg2: '#eadac0',
     accent: '#8c7662',
     icon: '📷',
   };
