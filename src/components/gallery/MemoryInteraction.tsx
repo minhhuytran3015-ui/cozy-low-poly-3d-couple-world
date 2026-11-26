@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { memories } from '../../data/memories';
+import { getWallFrameTransform, memories } from '../../data/memories';
 import type { Memory } from '../../data/memories';
 
 interface MemoryInteractionProps {
@@ -24,28 +24,8 @@ export const MemoryInteraction: React.FC<MemoryInteractionProps> = ({
   // Pre-calculate world positions for each memory on the walls
   const memoryPositions = useMemo(() => {
     return memories.map((m) => {
-      let x = 0;
-      let y = m.position[1];
-      let z = 0;
-      switch (m.wall) {
-        case 'north':
-          x = m.position[0];
-          z = -5.0;
-          break;
-        case 'south':
-          x = m.position[0];
-          z = 5.0;
-          break;
-        case 'east':
-          x = 5.0;
-          z = m.position[0];
-          break;
-        case 'west':
-          x = -5.0;
-          z = m.position[0];
-          break;
-      }
-      return { memory: m, pos: new THREE.Vector3(x, y, z) };
+      const { framePos } = getWallFrameTransform(m.wall, m.position);
+      return { memory: m, pos: new THREE.Vector3(framePos[0], framePos[1], framePos[2]) };
     });
   }, []);
 

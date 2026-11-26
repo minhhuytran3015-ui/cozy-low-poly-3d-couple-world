@@ -1,4 +1,69 @@
-export type WallType = 'north' | 'south' | 'east' | 'west';
+import {
+  MUSEUM_MAX_X,
+  MUSEUM_MAX_Z,
+  MUSEUM_MIN_X,
+  MUSEUM_MIN_Z,
+  ROOM1_HALF,
+} from './roomConfig';
+
+export type WallType =
+  | 'north'
+  | 'south'
+  | 'east'
+  | 'west'
+  | 'museum-north'
+  | 'museum-south'
+  | 'museum-east'
+  | 'museum-west';
+
+export function getWallFrameTransform(
+  wall: WallType,
+  position: [number, number]
+): { framePos: [number, number, number]; frameRot: [number, number, number] } {
+  const offset = 0.04;
+  switch (wall) {
+    case 'north':
+      return {
+        framePos: [position[0], position[1], -(ROOM1_HALF - offset)],
+        frameRot: [0, 0, 0],
+      };
+    case 'south':
+      return {
+        framePos: [position[0], position[1], ROOM1_HALF - offset],
+        frameRot: [0, Math.PI, 0],
+      };
+    case 'east':
+      return {
+        framePos: [ROOM1_HALF - offset, position[1], position[0]],
+        frameRot: [0, -Math.PI / 2, 0],
+      };
+    case 'west':
+      return {
+        framePos: [-(ROOM1_HALF - offset), position[1], position[0]],
+        frameRot: [0, Math.PI / 2, 0],
+      };
+    case 'museum-north':
+      return {
+        framePos: [position[0], position[1], MUSEUM_MIN_Z + offset],
+        frameRot: [0, 0, 0],
+      };
+    case 'museum-south':
+      return {
+        framePos: [position[0], position[1], MUSEUM_MAX_Z - offset],
+        frameRot: [0, Math.PI, 0],
+      };
+    case 'museum-east':
+      return {
+        framePos: [MUSEUM_MAX_X - offset, position[1], position[0]],
+        frameRot: [0, -Math.PI / 2, 0],
+      };
+    case 'museum-west':
+      return {
+        framePos: [MUSEUM_MIN_X + offset, position[1], position[0]],
+        frameRot: [0, Math.PI / 2, 0],
+      };
+  }
+}
 
 export interface Memory {
   id: string;
@@ -126,8 +191,7 @@ export const memories: Memory[] = [
   },
 
   // =========================================================================
-  // EAST WALL (X = +5.0) - 4 Frames
-  // Safe horizontal Z range: [-2.0 to +3.4] (avoids corner floor lamp at Z = -3.8)
+  // EAST WALL (X = +5.0) - 4 Frames (avoids doorway at Z in [-0.85, +0.85])
   // =========================================================================
   {
     id: 'memory-08',
@@ -137,7 +201,7 @@ export const memories: Memory[] = [
     type: 'image',
     src: '/memories/8.jpg',
     wall: 'east',
-    position: [-1.8, 2.2],
+    position: [-2.05, 2.2],
     width: 1.05,
     height: 1.40,
     orientation: 'portrait',
@@ -150,9 +214,9 @@ export const memories: Memory[] = [
     type: 'image',
     src: '/memories/9.jpg',
     wall: 'east',
-    position: [-0.2, 2.25],
-    width: 1.45,
-    height: 0.97,
+    position: [1.75, 2.25],
+    width: 1.35,
+    height: 0.9,
     orientation: 'landscape',
   },
   {
@@ -163,9 +227,9 @@ export const memories: Memory[] = [
     type: 'image',
     src: '/memories/10.jpg',
     wall: 'east',
-    position: [1.3, 2.2],
-    width: 0.95,
-    height: 1.42,
+    position: [3.0, 2.2],
+    width: 0.9,
+    height: 1.34,
     orientation: 'portrait',
   },
   {
@@ -176,9 +240,9 @@ export const memories: Memory[] = [
     type: 'image',
     src: '/memories/11.jpg',
     wall: 'east',
-    position: [2.8, 2.2],
-    width: 1.45,
-    height: 0.97,
+    position: [4.2, 2.2],
+    width: 1.25,
+    height: 0.85,
     orientation: 'landscape',
   },
 
@@ -239,6 +303,70 @@ export const memories: Memory[] = [
     height: 1.36,
     orientation: 'portrait',
   },
+
+  // =========================================================================
+  // MUSEUM ROOM (X: 5.4..21.4, Z: -8.0..+8.0) - 18 Curated Slots
+  // Replace src: null with '/memories/16.jpg' or '/memories/17.mp4' anytime!
+  // =========================================================================
+  // Museum North Wall (Z = -8.0) - 5 Slots
+  ...[7.4, 10.4, 13.4, 16.4, 19.4].map((x, idx): Memory => ({
+    id: `museum-0${idx + 1}`,
+    title: `Kỷ niệm Bảo tàng #${String(idx + 1).padStart(2, '0')}`,
+    description: 'Khung trưng bày sẵn sàng — bạn có thể thêm ảnh hoặc video kỷ niệm vào đây.',
+    date: '',
+    type: idx === 2 ? 'video' : 'image',
+    src: null,
+    wall: 'museum-north',
+    position: [x, 2.3],
+    width: 1.55,
+    height: 1.05,
+    orientation: 'landscape',
+  })),
+
+  // Museum South Wall (Z = +8.0) - 5 Slots
+  ...[7.4, 10.4, 13.4, 16.4, 19.4].map((x, idx): Memory => ({
+    id: `museum-${String(idx + 6).padStart(2, '0')}`,
+    title: `Kỷ niệm Bảo tàng #${String(idx + 6).padStart(2, '0')}`,
+    description: 'Khung trưng bày sẵn sàng — bạn có thể thêm ảnh hoặc video kỷ niệm vào đây.',
+    date: '',
+    type: idx === 1 ? 'video' : 'image',
+    src: null,
+    wall: 'museum-south',
+    position: [x, 2.3],
+    width: 1.55,
+    height: 1.05,
+    orientation: 'landscape',
+  })),
+
+  // Museum East Wall (X = +21.4) - 5 Slots
+  ...[-5.6, -2.8, 0, 2.8, 5.6].map((z, idx): Memory => ({
+    id: `museum-${String(idx + 11).padStart(2, '0')}`,
+    title: `Kỷ niệm Bảo tàng #${String(idx + 11).padStart(2, '0')}`,
+    description: 'Khung trưng bày sẵn sàng — bạn có thể thêm ảnh hoặc video kỷ niệm vào đây.',
+    date: '',
+    type: idx === 2 ? 'video' : 'image',
+    src: null,
+    wall: 'museum-east',
+    position: [z, 2.3],
+    width: idx % 2 === 0 ? 1.55 : 1.08,
+    height: idx % 2 === 0 ? 1.05 : 1.42,
+    orientation: idx % 2 === 0 ? 'landscape' : 'portrait',
+  })),
+
+  // Museum West Wall (X = +5.4, flanking the doorway) - 3 Slots
+  ...[-4.6, 2.8, 5.6].map((z, idx): Memory => ({
+    id: `museum-${String(idx + 16).padStart(2, '0')}`,
+    title: `Kỷ niệm Bảo tàng #${String(idx + 16).padStart(2, '0')}`,
+    description: 'Khung trưng bày sẵn sàng — bạn có thể thêm ảnh hoặc video kỷ niệm vào đây.',
+    date: '',
+    type: 'image',
+    src: null,
+    wall: 'museum-west',
+    position: [z, 2.3],
+    width: 1.45,
+    height: 1.05,
+    orientation: 'landscape',
+  })),
 ];
 
 export default memories;

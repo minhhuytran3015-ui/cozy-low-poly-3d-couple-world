@@ -104,8 +104,12 @@ function getInitialRoomFromUrl(): string | null {
   return null;
 }
 
-function clampCoord(val: number): number {
-  return Math.max(-5, Math.min(5, val));
+function clampCoordX(val: number): number {
+  return Math.max(-5, Math.min(21.5, val));
+}
+
+function clampCoordZ(val: number): number {
+  return Math.max(-8, Math.min(8, val));
 }
 
 function sanitizeChatText(raw: unknown): string | null {
@@ -193,8 +197,8 @@ function parseCharacterState(raw: unknown): CharacterSyncState | null {
 
   return {
     character: obj.character,
-    x: clampCoord(obj.x),
-    z: clampCoord(obj.z),
+    x: clampCoordX(obj.x),
+    z: clampCoordZ(obj.z),
     rotation: obj.rotation,
     isMoving: obj.isMoving,
     isSprinting: obj.isSprinting,

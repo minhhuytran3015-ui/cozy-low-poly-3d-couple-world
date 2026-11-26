@@ -83,23 +83,43 @@ export const Walls: React.FC<WallsProps> = ({
         <meshStandardMaterial color={baseboardColor} roughness={0.8} />
       </mesh>
 
-      {/* 4. East / Right Wall (X = +5) */}
+      {/* 4. East / Right Wall (X = +5) with doorway opening at Z in [-0.85, +0.85], Y < 2.45 */}
+      {/* East Wall Left Segment (Z: -5.0 to -0.85, length 4.15) */}
       <mesh
-        position={[halfSize + halfThick, halfHeight, 0]}
+        position={[halfSize + halfThick, halfHeight, -2.925]}
         castShadow
         receiveShadow
       >
-        <boxGeometry args={[wallThickness, wallHeight, roomSize]} />
-        <meshStandardMaterial
-          color={color}
-          roughness={0.85}
-          metalness={0.02}
-        />
+        <boxGeometry args={[wallThickness, wallHeight, 4.15]} />
+        <meshStandardMaterial color={color} roughness={0.85} metalness={0.02} />
       </mesh>
-      {/* East Baseboard */}
-      <mesh position={[halfSize - baseboardThick / 2, baseboardY, 0]} receiveShadow>
-        <boxGeometry args={[baseboardThick, baseboardHeight, roomSize]} />
+      <mesh position={[halfSize - baseboardThick / 2, baseboardY, -2.925]} receiveShadow>
+        <boxGeometry args={[baseboardThick, baseboardHeight, 4.15]} />
         <meshStandardMaterial color={baseboardColor} roughness={0.8} />
+      </mesh>
+
+      {/* East Wall Right Segment (Z: +0.85 to +5.0, length 4.15) */}
+      <mesh
+        position={[halfSize + halfThick, halfHeight, 2.925]}
+        castShadow
+        receiveShadow
+      >
+        <boxGeometry args={[wallThickness, wallHeight, 4.15]} />
+        <meshStandardMaterial color={color} roughness={0.85} metalness={0.02} />
+      </mesh>
+      <mesh position={[halfSize - baseboardThick / 2, baseboardY, 2.925]} receiveShadow>
+        <boxGeometry args={[baseboardThick, baseboardHeight, 4.15]} />
+        <meshStandardMaterial color={baseboardColor} roughness={0.8} />
+      </mesh>
+
+      {/* East Wall Top Header above Door (Y: 2.45 to 3.5, Z: -0.85 to +0.85) */}
+      <mesh
+        position={[halfSize + halfThick, 2.45 + (wallHeight - 2.45) / 2, 0]}
+        castShadow
+        receiveShadow
+      >
+        <boxGeometry args={[wallThickness, wallHeight - 2.45, 1.7]} />
+        <meshStandardMaterial color={color} roughness={0.85} metalness={0.02} />
       </mesh>
     </group>
   );

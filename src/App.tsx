@@ -8,11 +8,13 @@ import TouchControls from './components/ui/TouchControls';
 import GalleryDrawer from './components/ui/GalleryDrawer';
 import MultiplayerModal from './components/ui/MultiplayerModal';
 import ChatBox from './components/ui/ChatBox';
+import GiftViewer from './components/ui/GiftViewer';
 import MemoryViewer from './components/gallery/MemoryViewer';
 import type { CharacterType } from './components/character/types';
 import type { CameraControlHandle } from './components/camera/FollowCamera';
 import { memories } from './data/memories';
 import type { Memory } from './data/memories';
+import type { GiftCaseItem } from './data/giftCases';
 import useKeyboardControls from './hooks/useKeyboardControls';
 import useDeviceMode from './hooks/useDeviceMode';
 import useMultiplayer from './hooks/useMultiplayer';
@@ -22,9 +24,18 @@ export const App: React.FC = () => {
   const [activeCharacter, setActiveCharacter] = useState<CharacterType>('boy');
   const [nearbyMemory, setNearbyMemory] = useState<Memory | null>(null);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
+  const [selectedGift, setSelectedGift] = useState<GiftCaseItem | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState<boolean>(false);
   const [isMultiplayerOpen, setIsMultiplayerOpen] = useState<boolean>(false);
   const [isChatFocused, setIsChatFocused] = useState<boolean>(false);
+  const [nearDoor, setNearDoor] = useState<{
+    near: boolean;
+    direction: 'to-museum' | 'to-room1';
+  }>({ near: false, direction: 'to-museum' });
+  const [isDoorOpen, setIsDoorOpen] = useState<boolean>(false);
+  const [cinematicDirection, setCinematicDirection] = useState<
+    'to-museum' | 'to-room1' | null
+  >(null);
 
   const cameraControlRef = useRef<CameraControlHandle | null>(null);
   const { inputMode, toggleInputMode } = useDeviceMode();
@@ -34,7 +45,27 @@ export const App: React.FC = () => {
     onAssignCharacter: setActiveCharacter,
   });
 
-  const isOverlayOpen = !!selectedMemory || isGalleryOpen || isMultiplayerOpen;
+  const isOverlayOpen = !!selectedMemory || !!selectedGift || isGalleryOpen || isMultiplayerOpen;
+
+  const handleNearDoorChange = useCallback(
+    (near: boolean, direction: 'to-museum' | 'to-room1') => {
+      setNearDoor({ near, direction });
+    },
+    []
+  );
+
+  const handleOpenDoor = useCallback(() => {
+    if (cinematicDirection) return;
+    setIsDoorOpen(true);
+    setCinematicDirection(nearDoor.direction);
+  }, [cinematicDirection, nearDoor.direction]);
+
+  const handleDoorTransitionComplete = useCallback(() => {
+    setCinematicDirection(null);
+    window.setTimeout(() => {
+      setIsDoorOpen(false);
+    }, 900);
+  }, []);
 
   const handleSwitchCharacter = useCallback(
     (newType?: CharacterType) => {
@@ -112,6 +143,12 @@ export const App: React.FC = () => {
         girlEmote={multiplayer.emotes.girl}
         boyChatBubble={multiplayer.chatBubbles.boy}
         girlChatBubble={multiplayer.chatBubbles.girl}
+        isDoorOpen={isDoorOpen}
+        isNearDoor={nearDoor.near}
+        cinematicDirection={cinematicDirection}
+        onNearDoorChange={handleNearDoorChange}
+        onDoorTransitionComplete={handleDoorTransitionComplete}
+        onSelectGift={setSelectedGift}
       />
 
       {/* Responsive HUD (Phone / iPad / Desktop) */}
@@ -153,8 +190,54 @@ export const App: React.FC = () => {
         memory={nearbyMemory}
         onOpen={handleOpenMemory}
         inputMode={inputMode}
-        visible={hasEntered && !isOverlayOpen}
+        visible={hasEntered && !isOverlayOpen && !cinematicDirection}
       />
+
+      {/* Connecting Door "Mở cửa" Prompt */}
+      {hasEntered && !isOverlayOpen && nearDoor.near && !cinematicDirection && (
+        <button
+          type="button"
+          onClick={handleOpenDoor}
+          aria-label="Mở cửa"
+          style={{
+            position: 'absolute',
+            bottom:
+              inputMode === 'touch'
+                ? 'max(146px, calc(126px + env(safe-area-inset-bottom, 20px)))'
+                : nearbyMemory
+                  ? '98px'
+                  : '44px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 52,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '11px 22px',
+            borderRadius: '999px',
+            backgroundColor: 'rgba(255, 250, 244, 0.96)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1.5px solid #8d6748',
+            boxShadow: '0 8px 24px rgba(141, 103, 72, 0.28)',
+            color: '#4a3525',
+            fontWeight: 700,
+            fontSize: '0.94rem',
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+          }}
+        >
+          <span aria-hidden="true">🚪</span>
+          <span>
+            {nearDoor.direction === 'to-museum'
+              ? 'Mở cửa vào Bảo tàng'
+              : 'Mở cửa về Phòng chính'}
+          </span>
+        </button>
+      )}
+
+      {/* Glass Display Case Gift Viewer */}
+      <GiftViewer gift={selectedGift} onClose={() => setSelectedGift(null)} />
 
       {/* Quick Gallery Album Drawer */}
       <GalleryDrawer

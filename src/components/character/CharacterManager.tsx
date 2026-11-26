@@ -7,6 +7,18 @@ import GirlCharacter from './GirlCharacter';
 import type { CharacterType } from './types';
 import type { KeyboardState } from '../../hooks/useKeyboardControls';
 import type { CharacterSyncState, EmoteType } from '../../hooks/useMultiplayer';
+import { giftCases } from '../../data/giftCases';
+import {
+  CHAR_MARGIN,
+  DOOR_PASS_HALF_Z,
+  DOOR_X_END,
+  DOOR_X_START,
+  MUSEUM_MAX_X,
+  MUSEUM_MAX_Z,
+  MUSEUM_MIN_X,
+  MUSEUM_MIN_Z,
+  ROOM1_HALF,
+} from '../../data/roomConfig';
 
 interface CharacterManagerProps {
   activeCharacter: CharacterType;
@@ -21,17 +33,70 @@ interface CharacterManagerProps {
   girlEmote?: EmoteType | null;
   boyChatBubble?: string | null;
   girlChatBubble?: string | null;
+  isDoorOpen?: boolean;
+  cinematicDirection?: 'to-museum' | 'to-room1' | null;
+  onNearDoorChange?: (near: boolean, direction: 'to-museum' | 'to-room1') => void;
+  onDoorTransitionComplete?: () => void;
 }
 
-// Obstacle definitions for cozy room furniture
+// Obstacle definitions for cozy room furniture + 5 museum glass display cases
 const OBSTACLES = [
   { x: -1.4, z: -1.2, radius: 0.85, name: 'coffee-table' },
   { x: -3.8, z: -3.8, radius: 0.65, name: 'potted-plant' },
   { x: 3.8, z: -3.8, radius: 0.60, name: 'floor-lamp' },
+  ...giftCases.map((g) => ({
+    x: g.position[0],
+    z: g.position[2],
+    radius: 0.72,
+    name: g.id,
+  })),
 ];
 
-const ROOM_HALF_SIZE = 4.55; // 10 units room minus 0.45 safe character margin
+const ROOM1_BOUND = ROOM1_HALF - CHAR_MARGIN; // 4.55
+const MUSEUM_BOUND_MIN_X = MUSEUM_MIN_X + CHAR_MARGIN; // 5.85
+const MUSEUM_BOUND_MAX_X = MUSEUM_MAX_X - CHAR_MARGIN; // 20.95
+const MUSEUM_BOUND_MIN_Z = MUSEUM_MIN_Z + CHAR_MARGIN; // -7.55
+const MUSEUM_BOUND_MAX_Z = MUSEUM_MAX_Z - CHAR_MARGIN; // 7.55
 const CHARACTER_RADIUS = 0.32;
+
+function clampToWorldBounds(
+  x: number,
+  z: number,
+  canPassDoor: boolean
+): [number, number] {
+  const inDoorGapZ = Math.abs(z) <= DOOR_PASS_HALF_Z;
+
+  // Room 1 side
+  if (x <= ROOM1_BOUND) {
+    return [
+      Math.max(-ROOM1_BOUND, x),
+      Math.max(-ROOM1_BOUND, Math.min(ROOM1_BOUND, z)),
+    ];
+  }
+
+  // Museum side
+  if (x >= MUSEUM_BOUND_MIN_X) {
+    return [
+      Math.min(MUSEUM_BOUND_MAX_X, x),
+      Math.max(MUSEUM_BOUND_MIN_Z, Math.min(MUSEUM_BOUND_MAX_Z, z)),
+    ];
+  }
+
+  // Doorway threshold corridor (4.55 < x < 5.85)
+  if (canPassDoor && inDoorGapZ) {
+    return [x, Math.max(-DOOR_PASS_HALF_Z, Math.min(DOOR_PASS_HALF_Z, z))];
+  }
+
+  // Door closed or outside door Z gap: push back to whichever room side is closer
+  const midDoorX = (DOOR_X_START + DOOR_X_END) / 2;
+  if (x < midDoorX) {
+    return [ROOM1_BOUND, Math.max(-ROOM1_BOUND, Math.min(ROOM1_BOUND, z))];
+  }
+  return [
+    MUSEUM_BOUND_MIN_X,
+    Math.max(MUSEUM_BOUND_MIN_Z, Math.min(MUSEUM_BOUND_MAX_Z, z)),
+  ];
+}
 
 export const CharacterManager: React.FC<CharacterManagerProps> = ({
   activeCharacter,
@@ -45,8 +110,17 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   girlEmote = null,
   boyChatBubble = null,
   girlChatBubble = null,
+  isDoorOpen = false,
+  cinematicDirection = null,
+  onNearDoorChange,
+  onDoorTransitionComplete,
 }) => {
   const { camera } = useThree();
+  const nearDoorRef = useRef<{ near: boolean; dir: 'to-museum' | 'to-room1' }>({
+    near: false,
+    dir: 'to-museum',
+  });
+  const cinematicStartRef = useRef<number | null>(null);
 
   // Boy state in refs for 60fps performance without re-render thrashing
   const boyTransform = useRef<CharacterTransformData>({
@@ -107,6 +181,70 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       other.isSprinting = false;
     }
 
+    // Detect proximity to the connecting door
+    if (onNearDoorChange && !cinematicDirection) {
+      const doorMidX = (DOOR_X_START + DOOR_X_END) / 2;
+      const distToDoor = Math.hypot(active.position.x - doorMidX, active.position.z);
+      const isNear = distToDoor < 2.05;
+      const dir: 'to-museum' | 'to-room1' =
+        active.position.x < doorMidX ? 'to-museum' : 'to-room1';
+      if (isNear !== nearDoorRef.current.near || dir !== nearDoorRef.current.dir) {
+        nearDoorRef.current = { near: isNear, dir };
+        onNearDoorChange(isNear, dir);
+      }
+    }
+
+    // Cinematic Door Walk-Through Animation
+    if (cinematicDirection) {
+      if (cinematicStartRef.current === null) {
+        cinematicStartRef.current = performance.now();
+      }
+      const elapsed = (performance.now() - cinematicStartRef.current) / 1000;
+      const targetX = cinematicDirection === 'to-museum' ? 7.1 : 3.5;
+      const targetZ = 0;
+
+      const dx = targetX - active.position.x;
+      const dz = targetZ - active.position.z;
+      const dist = Math.hypot(dx, dz);
+
+      if (elapsed > 0.35 && dist > 0.08) {
+        const walkSpeed = 2.05;
+        const step = Math.min(dist, walkSpeed * delta);
+        active.position.x += (dx / dist) * step;
+        active.position.z += (dz / dist) * step;
+        active.rotation = Math.atan2(dx, dz);
+        active.isMoving = true;
+        active.isSprinting = false;
+      } else {
+        active.rotation = cinematicDirection === 'to-museum' ? Math.PI / 2 : -Math.PI / 2;
+        active.isMoving = false;
+        active.isSprinting = false;
+      }
+
+      if (elapsed >= 2.75) {
+        cinematicStartRef.current = null;
+        onDoorTransitionComplete?.();
+      }
+
+      if (onSendLocalState) {
+        onSendLocalState({
+          character: activeCharacter,
+          x: active.position.x,
+          z: active.position.z,
+          rotation: active.rotation,
+          isMoving: active.isMoving,
+          isSprinting: false,
+        });
+      }
+      activePos.current.copy(active.position);
+      if (onTargetPositionChange) {
+        onTargetPositionChange(activePos.current);
+      }
+      return;
+    }
+
+    cinematicStartRef.current = null;
+
     if (!enabled) {
       active.isMoving = false;
       active.isSprinting = false;
@@ -163,11 +301,10 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       let nextX = active.position.x + moveDir.current.x * speed * delta;
       let nextZ = active.position.z + moveDir.current.z * speed * delta;
 
-      // 3. Collision with Room boundary walls
-      nextX = Math.max(-ROOM_HALF_SIZE, Math.min(ROOM_HALF_SIZE, nextX));
-      nextZ = Math.max(-ROOM_HALF_SIZE, Math.min(ROOM_HALF_SIZE, nextZ));
+      // 3. Collision with Room 1, Doorway, and Museum Room boundaries
+      [nextX, nextZ] = clampToWorldBounds(nextX, nextZ, isDoorOpen);
 
-      // 4. Collision with Furniture obstacles (circle push-out)
+      // 4. Collision with Furniture & Display Case obstacles (circle push-out)
       for (const obs of OBSTACLES) {
         const dx = nextX - obs.x;
         const dz = nextZ - obs.z;
@@ -195,8 +332,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
         }
       }
 
-      nextX = Math.max(-ROOM_HALF_SIZE, Math.min(ROOM_HALF_SIZE, nextX));
-      nextZ = Math.max(-ROOM_HALF_SIZE, Math.min(ROOM_HALF_SIZE, nextZ));
+      [nextX, nextZ] = clampToWorldBounds(nextX, nextZ, isDoorOpen);
 
       active.position.x = nextX;
       active.position.z = nextZ;

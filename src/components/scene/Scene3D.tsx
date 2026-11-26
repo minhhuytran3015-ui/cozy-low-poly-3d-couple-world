@@ -2,6 +2,8 @@ import React, { Suspense, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import Room from '../room/Room';
+import MuseumRoom from '../room/MuseumRoom';
+import ConnectingDoor from '../room/ConnectingDoor';
 import RoomCamera from '../camera/RoomCamera';
 import FollowCamera from '../camera/FollowCamera';
 import type { CameraControlHandle } from '../camera/FollowCamera';
@@ -12,6 +14,7 @@ import type { CharacterType } from '../character/types';
 import type { KeyboardState } from '../../hooks/useKeyboardControls';
 import type { CharacterSyncState, EmoteType } from '../../hooks/useMultiplayer';
 import type { Memory } from '../../data/memories';
+import type { GiftCaseItem } from '../../data/giftCases';
 
 interface Scene3DProps {
   isEntered?: boolean;
@@ -30,6 +33,12 @@ interface Scene3DProps {
   girlEmote?: EmoteType | null;
   boyChatBubble?: string | null;
   girlChatBubble?: string | null;
+  isDoorOpen?: boolean;
+  isNearDoor?: boolean;
+  cinematicDirection?: 'to-museum' | 'to-room1' | null;
+  onNearDoorChange?: (near: boolean, direction: 'to-museum' | 'to-room1') => void;
+  onDoorTransitionComplete?: () => void;
+  onSelectGift?: (gift: GiftCaseItem) => void;
 }
 
 export const Scene3D: React.FC<Scene3DProps> = ({
@@ -49,6 +58,12 @@ export const Scene3D: React.FC<Scene3DProps> = ({
   girlEmote = null,
   boyChatBubble = null,
   girlChatBubble = null,
+  isDoorOpen = false,
+  isNearDoor = false,
+  cinematicDirection = null,
+  onNearDoorChange,
+  onDoorTransitionComplete,
+  onSelectGift,
 }) => {
   // Shared ref for the active character's current position to drive FollowCamera & Interaction
   const targetPosRef = useRef(new THREE.Vector3(-1.2, 0, 0));
@@ -73,7 +88,7 @@ export const Scene3D: React.FC<Scene3DProps> = ({
         <color attach="background" args={['#f7f3ed']} />
 
         {/* Soft fog to blend room edges smoothly into the warm background */}
-        <fog attach="fog" args={['#f7f3ed', 20, 42]} />
+        <fog attach="fog" args={['#f7f3ed', 26, 56]} />
 
         {/* Camera System:
             Phase 1 Overview Camera before enter;
@@ -91,12 +106,15 @@ export const Scene3D: React.FC<Scene3DProps> = ({
             targetPosition={targetPosRef}
             enabled={!isViewerOpen}
             controlRef={cameraControlRef}
+            cinematicDirection={cinematicDirection}
           />
         )}
 
         {/* Main 3D Room Environment */}
         <Suspense fallback={null}>
           <Room size={10} wallHeight={3.5} wallThickness={0.2} />
+          <ConnectingDoor isOpen={isDoorOpen} isHighlighted={isNearDoor} />
+          <MuseumRoom onSelectGift={onSelectGift} />
         </Suspense>
 
         {/* 15 Memory Photo & Video Frames mounted on 4 walls */}
@@ -128,6 +146,10 @@ export const Scene3D: React.FC<Scene3DProps> = ({
           girlEmote={girlEmote}
           boyChatBubble={boyChatBubble}
           girlChatBubble={girlChatBubble}
+          isDoorOpen={isDoorOpen}
+          cinematicDirection={cinematicDirection}
+          onNearDoorChange={onNearDoorChange}
+          onDoorTransitionComplete={onDoorTransitionComplete}
         />
 
         {/* Soft ground shadow receiver below the room */}

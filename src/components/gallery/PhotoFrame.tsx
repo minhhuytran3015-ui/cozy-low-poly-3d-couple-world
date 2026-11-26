@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import type { Memory } from '../../data/memories';
+import { getWallFrameTransform } from '../../data/memories';
 import { getMemoryPlaceholderTexture } from './placeholderThumbnails';
 
 interface PhotoFrameProps {
@@ -52,31 +53,10 @@ export const PhotoFrame: React.FC<PhotoFrameProps> = ({
   }, [memory.src, memory.thumbnail, memory.type]);
 
   // Calculate 3D position and rotation against wall surface
-  const { framePos, frameRot } = useMemo(() => {
-    const wallOffset = 4.96; // slightly in front of 5.0 wall face to avoid z-fighting
-    switch (wall) {
-      case 'north':
-        return {
-          framePos: [position[0], position[1], -wallOffset] as [number, number, number],
-          frameRot: [0, 0, 0] as [number, number, number],
-        };
-      case 'south':
-        return {
-          framePos: [position[0], position[1], wallOffset] as [number, number, number],
-          frameRot: [0, Math.PI, 0] as [number, number, number],
-        };
-      case 'east':
-        return {
-          framePos: [wallOffset, position[1], position[0]] as [number, number, number],
-          frameRot: [0, -Math.PI / 2, 0] as [number, number, number],
-        };
-      case 'west':
-        return {
-          framePos: [-wallOffset, position[1], position[0]] as [number, number, number],
-          frameRot: [0, Math.PI / 2, 0] as [number, number, number],
-        };
-    }
-  }, [wall, position]);
+  const { framePos, frameRot } = useMemo(
+    () => getWallFrameTransform(wall, position),
+    [wall, position]
+  );
 
   // Fallback to warm procedural canvas texture if no external file or while loading
   const placeholderTexture = useMemo(() => {

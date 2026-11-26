@@ -2,6 +2,13 @@ import React, { useRef, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
+import {
+  MUSEUM_MAX_X,
+  MUSEUM_MAX_Z,
+  MUSEUM_MIN_Z,
+  ROOM1_HALF,
+} from '../../data/roomConfig';
+
 export interface CameraControlHandle {
   zoomIn: () => void;
   zoomOut: () => void;
@@ -12,6 +19,7 @@ interface FollowCameraProps {
   targetPosition: THREE.Vector3 | React.MutableRefObject<THREE.Vector3>;
   enabled?: boolean;
   controlRef?: React.MutableRefObject<CameraControlHandle | null>;
+  cinematicDirection?: 'to-museum' | 'to-room1' | null;
 }
 
 const DEFAULT_YAW = Math.PI * 0.25;
@@ -30,6 +38,7 @@ export const FollowCamera: React.FC<FollowCameraProps> = ({
   targetPosition,
   enabled = true,
   controlRef,
+  cinematicDirection = null,
 }) => {
   const { camera, gl, size } = useThree();
 
@@ -64,6 +73,19 @@ export const FollowCamera: React.FC<FollowCameraProps> = ({
       Math.min(maxDist, orbitState.current.targetDistance)
     );
   }, [minDist, maxDist]);
+
+  // Cinematic orbit behind character when opening the connecting door
+  useEffect(() => {
+    if (!cinematicDirection) return;
+    const desiredYaw = cinematicDirection === 'to-museum' ? -Math.PI / 2 : Math.PI / 2;
+    const current = orbitState.current.yaw;
+    let diff = desiredYaw - current;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    orbitState.current.targetYaw = current + diff;
+    orbitState.current.targetPitch = 1.08;
+    orbitState.current.targetDistance = isPortrait ? 4.8 : 3.9;
+  }, [cinematicDirection, isPortrait]);
 
   // Expose zoom / reset methods for HUD / Touch buttons
   useEffect(() => {
@@ -231,10 +253,15 @@ export const FollowCamera: React.FC<FollowCameraProps> = ({
     let camY = currentLookAt.current.y + dist * cosPitch;
     let camZ = currentLookAt.current.z + dist * sinPitch * cosYaw;
 
-    // Clamp camera within room boundary (room is 10x10, walls at +/- 5.0)
-    const roomMargin = 4.65;
-    camX = Math.max(-roomMargin, Math.min(roomMargin, camX));
-    camZ = Math.max(-roomMargin, Math.min(roomMargin, camZ));
+    // Clamp camera within the active room's boundary (Room 1 or Museum Room 2)
+    const inMuseum = target.x > ROOM1_HALF || !!cinematicDirection;
+    const minCamX = -(ROOM1_HALF - 0.35);
+    const maxCamX = MUSEUM_MAX_X - 0.35;
+    const minCamZ = inMuseum ? MUSEUM_MIN_Z + 0.35 : -(ROOM1_HALF - 0.35);
+    const maxCamZ = inMuseum ? MUSEUM_MAX_Z - 0.35 : ROOM1_HALF - 0.35;
+
+    camX = Math.max(minCamX, Math.min(maxCamX, camX));
+    camZ = Math.max(minCamZ, Math.min(maxCamZ, camZ));
     camY = Math.max(0.65, camY);
 
     tempPos.current.set(camX, camY, camZ);
