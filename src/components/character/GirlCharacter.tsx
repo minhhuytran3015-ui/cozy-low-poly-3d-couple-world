@@ -9,12 +9,14 @@ interface GirlCharacterProps {
   transformRef: React.MutableRefObject<CharacterTransformData>;
   isActive: boolean;
   emote?: EmoteType | null;
+  chatBubble?: string | null;
 }
 
 export const GirlCharacter: React.FC<GirlCharacterProps> = ({
   transformRef,
   isActive,
   emote = null,
+  chatBubble = null,
 }) => {
   const rootGroupRef = useRef<THREE.Group>(null);
   const bodyRef = useRef<THREE.Group>(null);
@@ -115,7 +117,13 @@ export const GirlCharacter: React.FC<GirlCharacterProps> = ({
   return (
     <group ref={rootGroupRef} name="girl-character">
       {/* Floating 3D Name Tag */}
-      <CharacterNameTag type="girl" isActive={isActive} offsetY={1.95} emote={emote} />
+      <CharacterNameTag
+        type="girl"
+        isActive={isActive}
+        offsetY={1.95}
+        emote={emote}
+        chatBubble={chatBubble}
+      />
 
       {/* Active Indicator Pin (Shows who is controlled) */}
       {isActive && (

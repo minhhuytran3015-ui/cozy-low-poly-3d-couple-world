@@ -19,6 +19,8 @@ interface CharacterManagerProps {
   onSendLocalState?: (state: CharacterSyncState) => void;
   boyEmote?: EmoteType | null;
   girlEmote?: EmoteType | null;
+  boyChatBubble?: string | null;
+  girlChatBubble?: string | null;
 }
 
 // Obstacle definitions for cozy room furniture
@@ -41,6 +43,8 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   onSendLocalState,
   boyEmote = null,
   girlEmote = null,
+  boyChatBubble = null,
+  girlChatBubble = null,
 }) => {
   const { camera } = useThree();
 
@@ -227,6 +231,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
         transformRef={boyTransform}
         isActive={activeCharacter === 'boy'}
         emote={boyEmote}
+        chatBubble={boyChatBubble}
       />
 
       {/* Girl Character */}
@@ -234,6 +239,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
         transformRef={girlTransform}
         isActive={activeCharacter === 'girl'}
         emote={girlEmote}
+        chatBubble={girlChatBubble}
       />
     </group>
   );

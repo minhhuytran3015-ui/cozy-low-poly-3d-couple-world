@@ -9,6 +9,13 @@ export type MultiplayerStatus = 'idle' | 'connecting' | 'waiting' | 'connected' 
 export type EmoteType = 'heart' | 'wave';
 export type TransportKind = 'supabase' | 'webrtc';
 
+export interface ChatMessage {
+  id: string;
+  character: CharacterType;
+  text: string;
+  sentAt: number;
+}
+
 export interface CharacterSyncState {
   character: CharacterType;
   x: number;
@@ -24,10 +31,14 @@ type IncomingPacket =
   | { type: 'welcome'; hostCharacter: CharacterType; state?: CharacterSyncState }
   | { type: 'state'; state: CharacterSyncState }
   | { type: 'emote'; character: CharacterType; emote: EmoteType }
+  | { type: 'chat'; message: ChatMessage }
   | { type: 'swap_role'; hostCharacter: CharacterType };
 
 const ROOM_CODE_REGEX = /^[a-zA-Z0-9_-]{4,24}$/;
 const ALLOWED_EMOTES: readonly EmoteType[] = ['heart', 'wave'];
+const CHAT_STORAGE_KEY = 'cozy_couple_chat_history_v1';
+const MAX_CHAT_HISTORY = 300;
+const MAX_CHAT_LENGTH = 240;
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || '';
@@ -97,6 +108,71 @@ function clampCoord(val: number): number {
   return Math.max(-5, Math.min(5, val));
 }
 
+function sanitizeChatText(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const cleaned = Array.from(raw, (ch) => {
+    const code = ch.charCodeAt(0);
+    return code < 32 || code === 127 ? ' ' : ch;
+  })
+    .join('')
+    .trim();
+  if (!cleaned) return null;
+  return cleaned.slice(0, MAX_CHAT_LENGTH);
+}
+
+function parseChatMessage(raw: unknown): ChatMessage | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.id !== 'string' || !obj.id.trim() || obj.id.length > 64) return null;
+  if (obj.character !== 'boy' && obj.character !== 'girl') return null;
+  const text = sanitizeChatText(obj.text);
+  if (!text) return null;
+  const sentAt =
+    typeof obj.sentAt === 'number' && Number.isFinite(obj.sentAt) && obj.sentAt > 0
+      ? obj.sentAt
+      : Date.now();
+  return {
+    id: obj.id,
+    character: obj.character,
+    text,
+    sentAt,
+  };
+}
+
+function loadChatHistory(): ChatMessage[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(CHAT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const valid: ChatMessage[] = [];
+    for (const item of parsed) {
+      const msg = parseChatMessage(item);
+      if (msg) valid.push(msg);
+    }
+    return valid.slice(-MAX_CHAT_HISTORY);
+  } catch {
+    return [];
+  }
+}
+
+function saveChatHistory(messages: ChatMessage[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      CHAT_STORAGE_KEY,
+      JSON.stringify(messages.slice(-MAX_CHAT_HISTORY))
+    );
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+function formatBubblePreview(text: string): string {
+  return text.length > 36 ? `${text.slice(0, 35).trimEnd()}…` : text;
+}
+
 function parseCharacterState(raw: unknown): CharacterSyncState | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const obj = raw as Record<string, unknown>;
@@ -149,6 +225,10 @@ function parsePacket(raw: unknown): IncomingPacket | null {
       }
       return { type: 'emote', character: obj.character, emote: obj.emote as EmoteType };
     }
+    case 'chat': {
+      const message = parseChatMessage(obj.message);
+      return message ? { type: 'chat', message } : null;
+    }
     case 'swap_role': {
       if (obj.hostCharacter !== 'boy' && obj.hostCharacter !== 'girl') return null;
       return { type: 'swap_role', hostCharacter: obj.hostCharacter };
@@ -180,12 +260,18 @@ export const useMultiplayer = ({
     boy: null,
     girl: null,
   });
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(loadChatHistory);
+  const [chatBubbles, setChatBubbles] = useState<{ boy: string | null; girl: string | null }>({
+    boy: null,
+    girl: null,
+  });
 
   const remoteStateRef = useRef<CharacterSyncState | null>(null);
   const lastLocalStateRef = useRef<CharacterSyncState | null>(null);
   const lastSentAtRef = useRef<number>(0);
   const lastSentMovingRef = useRef<boolean>(false);
   const lastSentSprintRef = useRef<boolean>(false);
+  const lastChatSentAtRef = useRef<number>(0);
 
   const peerRef = useRef<Peer | null>(null);
   const connRef = useRef<DataConnection | null>(null);
@@ -196,6 +282,7 @@ export const useMultiplayer = ({
   const activeCharRef = useRef<CharacterType>(activeCharacter);
   const onAssignCharRef = useRef(onAssignCharacter);
   const emoteTimersRef = useRef<{ boy?: number; girl?: number }>({});
+  const chatBubbleTimersRef = useRef<{ boy?: number; girl?: number }>({});
 
   useEffect(() => {
     activeCharRef.current = activeCharacter;
@@ -213,6 +300,29 @@ export const useMultiplayer = ({
       setEmotes((prev) => ({ ...prev, [character]: null }));
     }, 2600);
   }, []);
+
+  const triggerLocalChatBubble = useCallback((character: CharacterType, text: string) => {
+    const preview = formatBubblePreview(text);
+    setChatBubbles((prev) => ({ ...prev, [character]: preview }));
+    const prevTimer = chatBubbleTimersRef.current[character];
+    if (prevTimer) window.clearTimeout(prevTimer);
+    chatBubbleTimersRef.current[character] = window.setTimeout(() => {
+      setChatBubbles((prev) => ({ ...prev, [character]: null }));
+    }, 4500);
+  }, []);
+
+  const appendChatMessage = useCallback(
+    (msg: ChatMessage) => {
+      setChatMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        const next = [...prev, msg].slice(-MAX_CHAT_HISTORY);
+        saveChatHistory(next);
+        return next;
+      });
+      triggerLocalChatBubble(msg.character, msg.text);
+    },
+    [triggerLocalChatBubble]
+  );
 
   const syncUrlRoom = useCallback((code: string | null) => {
     if (typeof window === 'undefined') return;
@@ -318,6 +428,10 @@ export const useMultiplayer = ({
 
         case 'emote':
           triggerLocalEmoteDisplay(packet.character, packet.emote);
+          break;
+
+        case 'chat':
+          appendChatMessage(packet.message);
           break;
 
         case 'swap_role': {
@@ -582,7 +696,7 @@ export const useMultiplayer = ({
       cancelled = true;
       cleanupInstances();
     };
-  }, [roomCode, reconnectTick, triggerLocalEmoteDisplay]);
+  }, [roomCode, reconnectTick, triggerLocalEmoteDisplay, appendChatMessage]);
 
   const sendLocalState = useCallback(
     (state: CharacterSyncState) => {
@@ -635,6 +749,33 @@ export const useMultiplayer = ({
     [triggerLocalEmoteDisplay, transmitPacket]
   );
 
+  const sendChatMessage = useCallback(
+    (rawText: string): boolean => {
+      const text = sanitizeChatText(rawText);
+      if (!text) return false;
+
+      const now = Date.now();
+      if (now - lastChatSentAtRef.current < 250) return false;
+      lastChatSentAtRef.current = now;
+
+      const msg: ChatMessage = {
+        id: `${clientIdRef.current}-${now}-${Math.random().toString(36).slice(2, 6)}`,
+        character: activeCharRef.current,
+        text,
+        sentAt: now,
+      };
+      appendChatMessage(msg);
+      transmitPacket({ type: 'chat', message: msg });
+      return true;
+    },
+    [appendChatMessage, transmitPacket]
+  );
+
+  const clearChatHistory = useCallback(() => {
+    setChatMessages([]);
+    saveChatHistory([]);
+  }, []);
+
   const swapRoles = useCallback(() => {
     const nextLocal: CharacterType = activeCharRef.current === 'boy' ? 'girl' : 'boy';
     onAssignCharRef.current(nextLocal);
@@ -663,11 +804,15 @@ export const useMultiplayer = ({
     errorMsg,
     remoteStateRef,
     emotes,
+    chatMessages,
+    chatBubbles,
     createRoom,
     retryConnection,
     leaveRoom,
     sendLocalState,
     sendEmote,
+    sendChatMessage,
+    clearChatHistory,
     swapRoles,
   };
 };

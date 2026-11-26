@@ -11,6 +11,7 @@ interface CharacterNameTagProps {
   isActive: boolean;
   offsetY?: number;
   emote?: EmoteType | null;
+  chatBubble?: string | null;
 }
 
 export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
@@ -18,6 +19,7 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
   isActive,
   offsetY = 1.95,
   emote = null,
+  chatBubble = null,
 }) => {
   const config = characterConfig[type];
   const groupRef = useRef<THREE.Group>(null);
@@ -53,6 +55,40 @@ export const CharacterNameTag: React.FC<CharacterNameTagProps> = ({
   return (
     <group ref={groupRef} position={[0, offsetY, 0]}>
       <Billboard follow lockX={false} lockY={false} lockZ={false}>
+        {/* Floating 3D Speech Bubble for latest chat message */}
+        {chatBubble && (
+          <group position={[0, emote ? 0.39 : 0.22, 0.006]}>
+            <mesh position={[0, 0, -0.001]} renderOrder={15}>
+              <planeGeometry
+                args={[Math.min(1.45, Math.max(0.46, chatBubble.length * 0.036 + 0.14)), 0.14]}
+              />
+              <meshBasicMaterial color="#ffffff" transparent opacity={0.96} depthTest={false} />
+            </mesh>
+            <mesh position={[0, 0, -0.002]} renderOrder={14}>
+              <planeGeometry
+                args={[
+                  Math.min(1.45, Math.max(0.46, chatBubble.length * 0.036 + 0.14)) + 0.016,
+                  0.156,
+                ]}
+              />
+              <meshBasicMaterial color={borderColor} transparent opacity={0.75} depthTest={false} />
+            </mesh>
+            <Text
+              position={[0, 0, 0.002]}
+              fontSize={0.048}
+              maxWidth={1.32}
+              anchorX="center"
+              anchorY="middle"
+              color="#3a2e28"
+              fontWeight={600}
+              renderOrder={16}
+              material-depthTest={false}
+            >
+              {chatBubble}
+            </Text>
+          </group>
+        )}
+
         {/* Floating Emote Bubble when active */}
         {emote && (
           <group ref={emoteGroupRef} position={[0, 0.21, 0.005]}>

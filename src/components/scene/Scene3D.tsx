@@ -28,6 +28,8 @@ interface Scene3DProps {
   onSendLocalState?: (state: CharacterSyncState) => void;
   boyEmote?: EmoteType | null;
   girlEmote?: EmoteType | null;
+  boyChatBubble?: string | null;
+  girlChatBubble?: string | null;
 }
 
 export const Scene3D: React.FC<Scene3DProps> = ({
@@ -45,6 +47,8 @@ export const Scene3D: React.FC<Scene3DProps> = ({
   onSendLocalState,
   boyEmote = null,
   girlEmote = null,
+  boyChatBubble = null,
+  girlChatBubble = null,
 }) => {
   // Shared ref for the active character's current position to drive FollowCamera & Interaction
   const targetPosRef = useRef(new THREE.Vector3(-1.2, 0, 0));
@@ -122,6 +126,8 @@ export const Scene3D: React.FC<Scene3DProps> = ({
           onSendLocalState={onSendLocalState}
           boyEmote={boyEmote}
           girlEmote={girlEmote}
+          boyChatBubble={boyChatBubble}
+          girlChatBubble={girlChatBubble}
         />
 
         {/* Soft ground shadow receiver below the room */}

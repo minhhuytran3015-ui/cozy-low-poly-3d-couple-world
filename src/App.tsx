@@ -7,6 +7,7 @@ import InteractionPrompt from './components/ui/InteractionPrompt';
 import TouchControls from './components/ui/TouchControls';
 import GalleryDrawer from './components/ui/GalleryDrawer';
 import MultiplayerModal from './components/ui/MultiplayerModal';
+import ChatBox from './components/ui/ChatBox';
 import MemoryViewer from './components/gallery/MemoryViewer';
 import type { CharacterType } from './components/character/types';
 import type { CameraControlHandle } from './components/camera/FollowCamera';
@@ -23,6 +24,7 @@ export const App: React.FC = () => {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState<boolean>(false);
   const [isMultiplayerOpen, setIsMultiplayerOpen] = useState<boolean>(false);
+  const [isChatFocused, setIsChatFocused] = useState<boolean>(false);
 
   const cameraControlRef = useRef<CameraControlHandle | null>(null);
   const { inputMode, toggleInputMode } = useDeviceMode();
@@ -79,11 +81,11 @@ export const App: React.FC = () => {
 
   const keysRef = useKeyboardControls({
     onTabPress: () => {
-      if (!isOverlayOpen && !multiplayer.isPartnerOnline) {
+      if (!isOverlayOpen && !isChatFocused && !multiplayer.isPartnerOnline) {
         handleSwitchCharacter();
       }
     },
-    enabled: hasEntered && !isOverlayOpen,
+    enabled: hasEntered && !isOverlayOpen && !isChatFocused,
   });
 
   const handleEnterWorld = () => {
@@ -108,6 +110,8 @@ export const App: React.FC = () => {
         onSendLocalState={multiplayer.sendLocalState}
         boyEmote={multiplayer.emotes.boy}
         girlEmote={multiplayer.emotes.girl}
+        boyChatBubble={multiplayer.chatBubbles.boy}
+        girlChatBubble={multiplayer.chatBubbles.girl}
       />
 
       {/* Responsive HUD (Phone / iPad / Desktop) */}
@@ -131,6 +135,17 @@ export const App: React.FC = () => {
         cameraControlRef={cameraControlRef}
         onSwitchCharacter={() => handleSwitchCharacter()}
         visible={hasEntered && !isOverlayOpen && inputMode === 'touch'}
+      />
+
+      {/* Real-time Couple Chat, History & Keyword Search */}
+      <ChatBox
+        messages={multiplayer.chatMessages}
+        activeCharacter={activeCharacter}
+        isPartnerOnline={multiplayer.isPartnerOnline}
+        onSendMessage={multiplayer.sendChatMessage}
+        onClearHistory={multiplayer.clearChatHistory}
+        onInputFocusChange={setIsChatFocused}
+        visible={hasEntered && !isOverlayOpen}
       />
 
       {/* Proximity Interaction Prompt */}
