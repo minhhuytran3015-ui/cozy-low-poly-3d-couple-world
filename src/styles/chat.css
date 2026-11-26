@@ -374,28 +374,46 @@
   background: #cf694e;
 }
 
-/* Mobile & Touch Responsive: keep bottom-left clear for Touch Joystick */
+/* Mobile & Touch Responsive: keep bottom clear for Joystick and "Đổi người" / "Chạy nhanh" */
 @media (max-width: 768px) {
   .chat-toggle-btn {
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    padding: 9px 14px;
+    left: max(20px, env(safe-area-inset-left, 20px));
+    top: calc(max(20px, env(safe-area-inset-top, 20px)) + 56px);
+    bottom: auto;
+    transform: none;
+    height: 38px;
+    padding: 0 13px;
     font-size: 13px;
   }
 
   .chat-toggle-btn:hover {
-    transform: translateX(-50%);
+    transform: none;
   }
 
   .chat-panel {
     left: 12px;
     right: 12px;
-    top: calc(64px + env(safe-area-inset-top, 0px));
+    top: calc(max(20px, env(safe-area-inset-top, 20px)) + 102px);
     bottom: auto;
     width: auto;
     max-width: none;
-    height: min(56dvh, 410px);
-    max-height: calc(100dvh - 140px);
+    height: min(52dvh, 380px);
+    max-height: calc(100dvh - 180px);
+  }
+}
+
+@media (max-width: 640px) {
+  .chat-toggle-btn {
+    left: max(12px, env(safe-area-inset-left, 12px));
+    top: calc(max(12px, env(safe-area-inset-top, 12px)) + 48px);
+    height: 36px;
+    padding: 0 11px;
+    font-size: 0.76rem;
+  }
+
+  .chat-panel {
+    top: calc(max(12px, env(safe-area-inset-top, 12px)) + 92px);
+    height: min(50dvh, 360px);
+    max-height: calc(100dvh - 170px);
   }
 }
